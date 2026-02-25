@@ -1,0 +1,111 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: storybloom_postgres
+    environment:
+      POSTGRES_USER: storybloom
+      POSTGRES_PASSWORD: storybloom_dev_password
+      POSTGRES_DB: storybloom
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U storybloom"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - storybloom_network
+
+  # MinIO Object Storage
+  minio:
+    image: minio/minio:latest
+    container_name: storybloom_minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - storybloom_network
+
+  # FastAPI Application
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: storybloom_api
+    environment:
+      # Database
+      DATABASE_URL: postgresql+asyncpg://storybloom:storybloom_dev_password@postgres:5432/storybloom
+      
+      # MinIO
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin123
+      MINIO_BUCKET_NAME: storybloom
+      MINIO_USE_SSL: "false"
+      
+      # JWT
+      JWT_SECRET_KEY: dev_jwt_secret_key_change_in_production
+      JWT_ALGORITHM: HS256
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+      JWT_REFRESH_TOKEN_EXPIRE_DAYS: "7"
+      
+      # App
+      ENVIRONMENT: development
+      DEBUG: "true"
+      CORS_ORIGINS: '["http://localhost:3000","http://localhost:5173"]'
+      
+      # OpenAI (Optional for development)
+      # OPENAI_API_KEY: your_openai_api_key
+      
+      # Stripe (Optional for development)
+      # STRIPE_SECRET_KEY: your_stripe_secret_key
+      # STRIPE_PUBLISHABLE_KEY: your_stripe_publishable_key
+      # STRIPE_WEBHOOK_SECRET: your_stripe_webhook_secret
+    volumes:
+      - ./app:/app/app
+      - ./alembic:/app/alembic
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - storybloom_network
+    command: >
+      sh -c "
+        echo 'Waiting for services to be ready...' &&
+        sleep 5 &&
+        echo 'Running database migrations...' &&
+        alembic upgrade head &&
+        echo 'Starting FastAPI server...' &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      "
+
+volumes:
+  postgres_data:
+    driver: local
+  minio_data:
+    driver: local
+
+networks:
+  storybloom_network:
+    driver: bridge
