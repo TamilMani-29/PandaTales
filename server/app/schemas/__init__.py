@@ -1,12 +1,50 @@
 """Pydantic schemas"""
 
-from app.schemas.book_template import (
-    BookTemplateCreate,
-    BookTemplateFilters,
-    BookTemplateListItem,
-    BookTemplateResponse,
-    BookTemplateSeriesInfo,
-    BookTemplateUpdate,
+from app.schemas.coloring_book_template import (
+    ColoringBookTemplateCreate,
+    ColoringBookTemplateFilters,
+    ColoringBookTemplateListItem,
+    ColoringBookTemplateResponse,
+    ColoringBookTemplateUpdate,
+)
+from app.schemas.generated_book import (
+    BookGenerationCreate,
+    BookGenerationResponse,
+    BookPage,
+    ChildInfo,
+    GeneratedBookFilters,
+    GeneratedBookListItem,
+    GeneratedBookResponse,
+    GeneratedBookUpdate,
+    GenerationErrorDetail,
+    GenerationStatusCancelled,
+    GenerationStatusCompleted,
+    GenerationStatusFailed,
+    GenerationStatusProcessing,
+    GenerationStatusQueued,
+    GenerationStepStatus,
+    PhotoToColoringGenerationCreate,
+    TemplateInfo,
+    ThemeBasedGenerationCreate,
+)
+from app.schemas.generation_config import (
+    GenerationConfigCreate,
+    GenerationConfigFilters,
+    GenerationConfigListItem,
+    GenerationConfigResponse,
+    GenerationConfigUpdate,
+    PublicThemeItem,
+    ThemeConfigData,
+    ThemeCreate,
+    ThemeUpdate,
+)
+from app.schemas.story_book_template import (
+    StoryBookTemplateCreate,
+    StoryBookTemplateFilters,
+    StoryBookTemplateListItem,
+    StoryBookTemplateResponse,
+    StoryBookTemplateSeriesInfo,
+    StoryBookTemplateUpdate,
 )
 from app.schemas.user import (
     AccountDeletionRequest,
@@ -25,12 +63,48 @@ from app.schemas.user import (
 )
 
 __all__ = [
-    "BookTemplateCreate",
-    "BookTemplateUpdate",
-    "BookTemplateResponse",
-    "BookTemplateListItem",
-    "BookTemplateFilters",
-    "BookTemplateSeriesInfo",
+    # Story Book schemas
+    "StoryBookTemplateCreate",
+    "StoryBookTemplateUpdate",
+    "StoryBookTemplateResponse",
+    "StoryBookTemplateListItem",
+    "StoryBookTemplateFilters",
+    "StoryBookTemplateSeriesInfo",
+    # Coloring Book schemas
+    "ColoringBookTemplateCreate",
+    "ColoringBookTemplateUpdate",
+    "ColoringBookTemplateResponse",
+    "ColoringBookTemplateListItem",
+    "ColoringBookTemplateFilters",
+    # Generated Book schemas
+    "BookGenerationCreate",
+    "BookGenerationResponse",
+    "BookPage",
+    "ChildInfo",
+    "GeneratedBookFilters",
+    "GeneratedBookListItem",
+    "GeneratedBookResponse",
+    "GeneratedBookUpdate",
+    "GenerationErrorDetail",
+    "GenerationStatusCancelled",
+    "GenerationStatusCompleted",
+    "GenerationStatusFailed",
+    "GenerationStatusProcessing",
+    "GenerationStatusQueued",
+    "GenerationStepStatus",
+    "PhotoToColoringGenerationCreate",
+    "TemplateInfo",
+    "ThemeBasedGenerationCreate",
+    # Generation Config schemas
+    "GenerationConfigCreate",
+    "GenerationConfigFilters",
+    "GenerationConfigListItem",
+    "GenerationConfigResponse",
+    "GenerationConfigUpdate",
+    "PublicThemeItem",
+    "ThemeConfigData",
+    "ThemeCreate",
+    "ThemeUpdate",
     # User schemas
     "AccountDeletionRequest",
     "AddressCreate",

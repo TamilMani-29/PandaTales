@@ -46,7 +46,7 @@ async def seed_test_user():
         # Create test user
         test_user = User(
             id=test_user_id,
-            email="test@storybloom.com",
+            email="test@pandatales.com",
             password_hash="$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5NU7MXvL1pm",  # password: test123
             first_name="Test",
             last_name="User",

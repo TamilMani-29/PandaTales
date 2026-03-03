@@ -1,6 +1,6 @@
 # Getting Started Checklist
 
-Use this checklist to get your StoryBloom backend up and running.
+Use this checklist to get your PandaTales backend up and running.
 
 ## ✅ Pre-Installation
 
@@ -150,7 +150,7 @@ Use this checklist to get your StoryBloom backend up and running.
 - [ ] Can connect to PostgreSQL
   ```powershell
   # With Docker
-  docker-compose exec postgres psql -U storybloom -d storybloom
+  docker-compose exec postgres psql -U pandatales -d pandatales
   ```
 - [ ] Book templates table exists
   ```sql
@@ -245,6 +245,6 @@ uv pip install -e ".[dev]"
 
 ## ✅ You're Done!
 
-If all checkboxes are checked, your StoryBloom backend is ready for development!
+If all checkboxes are checked, your PandaTales backend is ready for development!
 
 Next: Start building the Authentication module or any other module from the API documentation.

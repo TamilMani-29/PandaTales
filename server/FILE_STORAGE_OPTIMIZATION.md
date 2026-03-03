@@ -1,6 +1,6 @@
 # File Storage Optimization Guide
 
-**For:** Story Bloom Backend  
+**For:** Panda Tales Backend  
 **Storage:** MinIO / AWS S3  
 **Date:** February 14, 2026
 
@@ -277,8 +277,8 @@ Authorization: Bearer <access_token>
   "message": "Upload confirmed successfully",
   "data": {
     "fileId": "upload_abc123",
-    "url": "https://storybloom-bucket.s3.amazonaws.com/uploads/photos/child_photo_abc123.jpg",
-    "cdnUrl": "https://cdn.storybloom.com/uploads/photos/child_photo_abc123.jpg",
+    "url": "https://pandatales-bucket.s3.amazonaws.com/uploads/photos/child_photo_abc123.jpg",
+    "cdnUrl": "https://cdn.pandatales.com/uploads/photos/child_photo_abc123.jpg",
     "fileSize": 2048576,
     "contentType": "image/jpeg"
   }
@@ -308,7 +308,7 @@ Authorization: Bearer <access_token>
     "fileName": "child_photo.jpg",
     "fileSize": 2048576,
     "purpose": "child_photo",
-    "url": "https://cdn.storybloom.com/...",
+    "url": "https://cdn.pandatales.com/...",
     "createdAt": "2026-02-14T10:30:00Z",
     "completedAt": "2026-02-14T10:30:45Z"
   }
@@ -357,7 +357,7 @@ Authorization: Bearer <access_token>
         "fileSize": 2048576,
         "purpose": "child_photo",
         "status": "completed",
-        "url": "https://cdn.storybloom.com/...",
+        "url": "https://cdn.pandatales.com/...",
         "createdAt": "2026-02-14T10:30:00Z"
       }
     ],
@@ -832,17 +832,17 @@ STORAGE_PROVIDER=minio
 AWS_ACCESS_KEY_ID=your-access-key
 AWS_SECRET_ACCESS_KEY=your-secret-key
 AWS_REGION=us-east-1
-S3_BUCKET=storybloom-files
+S3_BUCKET=pandatales-files
 
 # MinIO Configuration
 MINIO_ENDPOINT=http://minio:9000
 MINIO_ACCESS_KEY=minioadmin
 MINIO_SECRET_KEY=minioadmin
-MINIO_BUCKET=storybloom-files
+MINIO_BUCKET=pandatales-files
 MINIO_SECURE=false  # Use HTTPS
 
 # CloudFront (optional, for S3)
-CLOUDFRONT_DOMAIN=cdn.storybloom.com
+CLOUDFRONT_DOMAIN=cdn.pandatales.com
 CLOUDFRONT_KEY_ID=your-key-id
 CLOUDFRONT_PRIVATE_KEY_PATH=/path/to/private-key.pem
 

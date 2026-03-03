@@ -1,4 +1,4 @@
-"""Quick setup script for StoryBloom backend"""
+"""Quick setup script for PandaTales backend"""
 
 import asyncio
 import sys
@@ -35,7 +35,7 @@ def check_file_exists(file_path: str) -> bool:
 def main():
     """Main setup function"""
     print("\n" + "="*60)
-    print("🚀 StoryBloom Backend Setup")
+    print("🚀 PandaTales Backend Setup")
     print("="*60)
 
     # Step 1: Check .env file

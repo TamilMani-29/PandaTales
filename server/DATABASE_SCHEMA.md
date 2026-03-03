@@ -1,4 +1,4 @@
-# Story Bloom - Database Schema Design
+# Panda Tales - Database Schema Design
 
 **Database:** PostgreSQL 15+  
 **ORM:** SQLAlchemy 2.0 (Async)  
@@ -23,7 +23,7 @@
 
 ## Overview
 
-The Story Bloom database is designed to support a personalized children's book platform with the following key features:
+The Panda Tales database is designed to support a personalized children's book platform with the following key features:
 
 - User authentication and profiles
 - Book template catalog
@@ -46,7 +46,7 @@ The Story Bloom database is designed to support a personalized children's book p
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    Story Bloom Database                  │
+│                    Panda Tales Database                  │
 ├─────────────────────────────────────────────────────────┤
 │                                                           │
 │  ┌──────────────┐         ┌──────────────┐             │
@@ -201,29 +201,32 @@ COMMENT ON COLUMN addresses.country IS 'ISO 3166-1 alpha-2 country code (e.g., U
 
 ---
 
-### 4. Book Templates Table
+### 4. Story Book Templates Table
 
-**Table Name:** `book_templates`
+**Table Name:** `story_book_templates`
 
-**Description:** Pre-designed book templates (story books and coloring books).
+**Description:** Pre-designed story book templates for personalized storytelling.
 
 ```sql
-CREATE TABLE book_templates (
+CREATE TABLE story_book_templates (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     title VARCHAR(255) NOT NULL,
     description TEXT NOT NULL,
     long_description TEXT,
     
     -- Type and categorization
-    template_type VARCHAR(20) NOT NULL CHECK (template_type IN ('story_book', 'coloring_book')),
-    book_type VARCHAR(20) CHECK (book_type IN ('single', 'series')),  -- For story books
-    series_id UUID REFERENCES book_templates(id),  -- Self-referencing for series
+    book_type VARCHAR(20) CHECK (book_type IN ('single', 'series')),
+    series_id UUID REFERENCES story_book_templates(id),  -- Self-referencing for series
     book_number INTEGER,  -- Position in series
     
     -- Classification
     genre VARCHAR(50) NOT NULL,
     age_group VARCHAR(20) NOT NULL CHECK (age_group IN ('0-2', '3-5', '6-8', '9-12')),
-    difficulty VARCHAR(20) CHECK (difficulty IN ('easy', 'medium', 'hard')),  -- For coloring books
+    
+    -- Story-specific attributes
+    story_theme VARCHAR(100),
+    moral_lesson TEXT,
+    reading_level VARCHAR(20) CHECK (reading_level IN ('beginner', 'intermediate', 'advanced')),
     
     -- Pricing
     price DECIMAL(10, 2) NOT NULL CHECK (price >= 0),
@@ -236,6 +239,7 @@ CREATE TABLE book_templates (
     total_pages INTEGER NOT NULL CHECK (total_pages > 0),
     features JSONB DEFAULT '[]',  -- Array of feature strings
     learning_outcomes JSONB DEFAULT '[]',  -- Array of learning outcomes
+    chapters JSONB DEFAULT '[]',  -- Array of chapter information
     
     -- Customization options
     customization_options JSONB DEFAULT '{}',
@@ -253,29 +257,98 @@ CREATE TABLE book_templates (
 );
 
 -- Indexes
-CREATE INDEX idx_templates_type ON book_templates(template_type);
-CREATE INDEX idx_templates_genre ON book_templates(genre);
-CREATE INDEX idx_templates_age_group ON book_templates(age_group);
-CREATE INDEX idx_templates_active ON book_templates(is_active, is_published);
-CREATE INDEX idx_templates_series ON book_templates(series_id, book_number);
-CREATE INDEX idx_templates_price ON book_templates(price);
+CREATE INDEX idx_story_templates_genre ON story_book_templates(genre);
+CREATE INDEX idx_story_templates_age_group ON story_book_templates(age_group);
+CREATE INDEX idx_story_templates_active_published ON story_book_templates(is_active, is_published);
+CREATE INDEX idx_story_templates_series ON story_book_templates(series_id, book_number);
+CREATE INDEX idx_story_templates_price ON story_book_templates(price);
 
 -- GIN index for JSONB columns (for searching tags)
-CREATE INDEX idx_templates_tags ON book_templates USING GIN(tags);
+CREATE INDEX idx_story_templates_tags ON story_book_templates USING GIN(tags);
 
 -- Full-text search
-CREATE INDEX idx_templates_search ON book_templates 
+CREATE INDEX idx_story_templates_search ON story_book_templates 
     USING GIN(to_tsvector('english', title || ' ' || description));
 
 -- Comments
-COMMENT ON TABLE book_templates IS 'Pre-designed book templates catalog';
-COMMENT ON COLUMN book_templates.preview_images IS 'JSON array of preview image URLs';
-COMMENT ON COLUMN book_templates.customization_options IS 'JSON object with customization settings';
+COMMENT ON TABLE story_book_templates IS 'Pre-designed story book templates catalog';
+COMMENT ON COLUMN story_book_templates.preview_images IS 'JSON array of preview image URLs';
+COMMENT ON COLUMN story_book_templates.customization_options IS 'JSON object with customization settings';
+COMMENT ON COLUMN story_book_templates.chapters IS 'JSON array with chapter structure and content';
 ```
 
 ---
 
-### 5. Generation Requests Table
+### 5. Coloring Book Templates Table
+
+**Table Name:** `coloring_book_templates`
+
+**Description:** Pre-designed coloring book templates for creative activities.
+
+```sql
+CREATE TABLE coloring_book_templates (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    long_description TEXT,
+    
+    -- Classification
+    theme VARCHAR(50) NOT NULL,  -- e.g., animals, nature, fantasy
+    age_group VARCHAR(20) NOT NULL CHECK (age_group IN ('0-2', '3-5', '6-8', '9-12')),
+    
+    -- Coloring-specific attributes
+    art_style VARCHAR(50) CHECK (art_style IN ('cartoon', 'realistic', 'abstract', 'simple', 'detailed')),
+    
+    -- Pricing
+    price DECIMAL(10, 2) NOT NULL CHECK (price >= 0),
+    
+    -- Media
+    cover_image_url VARCHAR(500) NOT NULL,
+    preview_images JSONB DEFAULT '[]',  -- Array of preview image URLs
+    sample_pages JSONB DEFAULT '[]',  -- Array of sample coloring page URLs
+    
+    -- Content
+    total_pages INTEGER NOT NULL CHECK (total_pages > 0),
+    page_types JSONB DEFAULT '[]',  -- Array of page type descriptions
+    
+    -- Customization options
+    customization_options JSONB DEFAULT '{}',
+    
+    -- Metadata
+    tags JSONB DEFAULT '[]',  -- Array of tags
+    
+    -- Status
+    is_active BOOLEAN DEFAULT TRUE,
+    is_published BOOLEAN DEFAULT TRUE,
+    
+    -- Timestamps
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes
+CREATE INDEX idx_coloring_templates_theme ON coloring_book_templates(theme);
+CREATE INDEX idx_coloring_templates_age_group ON coloring_book_templates(age_group);
+CREATE INDEX idx_coloring_templates_active_published ON coloring_book_templates(is_active, is_published);
+CREATE INDEX idx_coloring_templates_price ON coloring_book_templates(price);
+
+-- GIN index for JSONB columns (for searching tags)
+CREATE INDEX idx_coloring_templates_tags ON coloring_book_templates USING GIN(tags);
+
+-- Full-text search
+CREATE INDEX idx_coloring_templates_search ON coloring_book_templates 
+    USING GIN(to_tsvector('english', title || ' ' || description));
+
+-- Comments
+COMMENT ON TABLE coloring_book_templates IS 'Pre-designed coloring book templates catalog';
+COMMENT ON COLUMN coloring_book_templates.preview_images IS 'JSON array of preview image URLs';
+COMMENT ON COLUMN coloring_book_templates.sample_pages IS 'JSON array of sample coloring page URLs';
+COMMENT ON COLUMN coloring_book_templates.customization_options IS 'JSON object with customization settings';
+```
+
+---
+
+### 6. Generation Requests Table
 
 **Table Name:** `generation_requests`
 
@@ -285,7 +358,11 @@ COMMENT ON COLUMN book_templates.customization_options IS 'JSON object with cust
 CREATE TABLE generation_requests (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    template_id UUID NOT NULL REFERENCES book_templates(id),
+    
+    -- Template reference (polymorphic)
+    template_type VARCHAR(20) NOT NULL CHECK (template_type IN ('story_book', 'coloring_book')),
+    template_id UUID NOT NULL,
+    
     child_id UUID REFERENCES child_profiles(id) ON DELETE SET NULL,
     
     -- Child info (denormalized for record keeping)
@@ -334,6 +411,8 @@ CREATE INDEX idx_generation_queue ON generation_requests(status, queue_position)
 
 -- Comments
 COMMENT ON TABLE generation_requests IS 'Book generation process tracking';
+COMMENT ON COLUMN generation_requests.template_type IS 'Type of template: story_book or coloring_book';
+COMMENT ON COLUMN generation_requests.template_id IS 'ID of the template (references either story_book_templates or coloring_book_templates)';
 COMMENT ON COLUMN generation_requests.photo_urls IS 'JSON array of uploaded photo S3 URLs';
 COMMENT ON COLUMN generation_requests.generation_duration IS 'Total time taken in seconds';
 ```
@@ -348,7 +427,11 @@ COMMENT ON COLUMN generation_requests.generation_duration IS 'Total time taken i
 
 ```sql
 CREATE TABLE generated_books (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    
+    -- Template reference (polymorphic)
+    template_type VARCHAR(20) NOT NULL CHECK (template_type IN ('story_book', 'coloring_book')),
+    template_id UUID NOT NULL,
+    
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     template_id UUID NOT NULL REFERENCES book_templates(id),
     generation_request_id UUID REFERENCES generation_requests(id),
@@ -1096,7 +1179,7 @@ pip install alembic
 alembic init alembic
 
 # Edit alembic.ini with database URL
-sqlalchemy.url = postgresql+asyncpg://user:pass@localhost/storybloom
+sqlalchemy.url = postgresql+asyncpg://user:pass@localhost/pandatales
 
 # Create initial migration
 alembic revision --autogenerate -m "Initial schema"
@@ -1186,7 +1269,7 @@ AND status IN ('completed', 'failed', 'cancelled');
 
 ```bash
 # Daily automated backups
-pg_dump -Fc storybloom > backup_$(date +%Y%m%d).dump
+pg_dump -Fc pandatales > backup_$(date +%Y%m%d).dump
 
 # Point-in-time recovery setup
 # Enable WAL archiving in postgresql.conf
@@ -1229,7 +1312,7 @@ checkpoint_completion_target = 0.9
 from sqlalchemy.ext.asyncio import create_async_engine
 
 engine = create_async_engine(
-    "postgresql+asyncpg://user:pass@localhost/storybloom",
+    "postgresql+asyncpg://user:pass@localhost/pandatales",
     pool_size=20,
     max_overflow=10,
     pool_pre_ping=True,

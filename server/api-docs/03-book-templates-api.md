@@ -73,10 +73,10 @@ GET /api/v1/templates/story-books?
         "genre": "adventure",
         "ageGroup": "3-5",
         "price": 24.99,
-        "coverImage": "https://cdn.storybloom.com/templates/sb_001_cover.jpg",
+        "coverImage": "https://cdn.pandatales.com/templates/sb_001_cover.jpg",
         "previewImages": [
-          "https://cdn.storybloom.com/templates/sb_001_p1.jpg",
-          "https://cdn.storybloom.com/templates/sb_001_p2.jpg"
+          "https://cdn.pandatales.com/templates/sb_001_p1.jpg",
+          "https://cdn.pandatales.com/templates/sb_001_p2.jpg"
         ],
         "totalPages": 20,
         "createdAt": "2025-12-01T00:00:00Z"
@@ -89,9 +89,9 @@ GET /api/v1/templates/story-books?
         "genre": "fantasy",
         "ageGroup": "6-8",
         "price": 29.99,
-        "coverImage": "https://cdn.storybloom.com/templates/sb_002_cover.jpg",
+        "coverImage": "https://cdn.pandatales.com/templates/sb_002_cover.jpg",
         "previewImages": [
-          "https://cdn.storybloom.com/templates/sb_002_p1.jpg"
+          "https://cdn.pandatales.com/templates/sb_002_p1.jpg"
         ],
         "totalPages": 24,
         "createdAt": "2025-11-15T00:00:00Z"
@@ -141,11 +141,11 @@ GET /api/v1/templates/story-books?
     "genre": "adventure",
     "ageGroup": "3-5",
     "price": 24.99,
-    "coverImage": "https://cdn.storybloom.com/templates/sb_001_cover.jpg",
+    "coverImage": "https://cdn.pandatales.com/templates/sb_001_cover.jpg",
     "previewImages": [
-      "https://cdn.storybloom.com/templates/sb_001_p1.jpg",
-      "https://cdn.storybloom.com/templates/sb_001_p2.jpg",
-      "https://cdn.storybloom.com/templates/sb_001_p3.jpg"
+      "https://cdn.pandatales.com/templates/sb_001_p1.jpg",
+      "https://cdn.pandatales.com/templates/sb_001_p2.jpg",
+      "https://cdn.pandatales.com/templates/sb_001_p3.jpg"
     ],
     "totalPages": 20,
     "features": [
@@ -200,12 +200,11 @@ Same as story books except:
         "genre": "fantasy",
         "ageGroup": "6-8",
         "price": 14.99,
-        "coverImage": "https://cdn.storybloom.com/templates/cb_001_cover.jpg",
+        "coverImage": "https://cdn.pandatales.com/templates/cb_001_cover.jpg",
         "previewImages": [
-          "https://cdn.storybloom.com/templates/cb_001_p1.jpg"
+          "https://cdn.pandatales.com/templates/cb_001_p1.jpg"
         ],
         "totalPages": 32,
-        "difficulty": "medium",
         "createdAt": "2025-11-20T00:00:00Z"
       }
     ],
@@ -452,7 +451,6 @@ class ColoringBookTemplate:
     cover_image: str
     preview_images: List[str]
     total_pages: int
-    difficulty: str  # 'easy', 'medium', 'hard'
     is_popular: bool
     tags: List[str]
     created_at: datetime

@@ -1,4 +1,4 @@
-"""Book Template Model"""
+"""Story Book Template Model"""
 
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -24,12 +24,12 @@ if TYPE_CHECKING:
     from app.models.generated_book import GeneratedBook
 
 
-class BookTemplate(Base, BaseModel, SoftDeleteMixin):
+class StoryBookTemplate(Base, BaseModel, SoftDeleteMixin):
     """
-    Book template model for story books and coloring books
+    Story book template model for personalized story books
     """
 
-    __tablename__ = "book_templates"
+    __tablename__ = "story_book_templates"
 
     # Basic Information
     title: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
@@ -37,11 +37,6 @@ class BookTemplate(Base, BaseModel, SoftDeleteMixin):
     long_description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Type and Categorization
-    template_type: Mapped[str] = mapped_column(
-        String(20),
-        nullable=False,
-        index=True,
-    )
     book_type: Mapped[str | None] = mapped_column(
         String(20),
         nullable=True,
@@ -56,7 +51,11 @@ class BookTemplate(Base, BaseModel, SoftDeleteMixin):
     # Classification
     genre: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     age_group: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
-    difficulty: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    
+    # Story-specific attributes
+    story_theme: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    moral_lesson: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reading_level: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     # Pricing
     price: Mapped[float] = mapped_column(
@@ -85,6 +84,13 @@ class BookTemplate(Base, BaseModel, SoftDeleteMixin):
         nullable=False,
         server_default=text("'[]'::jsonb"),
     )
+    
+    # Story structure
+    chapters: Mapped[dict] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=text("'[]'::jsonb"),
+    )
 
     # Customization
     customization_options: Mapped[dict] = mapped_column(
@@ -109,42 +115,38 @@ class BookTemplate(Base, BaseModel, SoftDeleteMixin):
     )
 
     # Relationships
-    generated_books: Mapped[list["GeneratedBook"]] = relationship(
-        "GeneratedBook",
-        back_populates="template",
-        lazy="selectin",
-    )
+    # generated_books: Mapped[list["GeneratedBook"]] = relationship(
+    #     "GeneratedBook",
+    #     back_populates="story_template",
+    #     lazy="selectin",
+    # )
 
     # Constraints
     __table_args__ = (
         CheckConstraint(
-            "template_type IN ('story_book', 'coloring_book')",
-            name="check_template_type",
-        ),
-        CheckConstraint(
             "book_type IN ('single', 'series') OR book_type IS NULL",
-            name="check_book_type",
+            name="check_story_book_type",
         ),
         CheckConstraint(
             "age_group IN ('0-2', '3-5', '6-8', '9-12')",
-            name="check_age_group",
+            name="check_story_age_group",
         ),
         CheckConstraint(
-            "difficulty IN ('easy', 'medium', 'hard') OR difficulty IS NULL",
-            name="check_difficulty",
+            "reading_level IN ('beginner', 'intermediate', 'advanced') OR reading_level IS NULL",
+            name="check_reading_level",
         ),
-        CheckConstraint("price >= 0", name="check_price_positive"),
-        CheckConstraint("total_pages > 0", name="check_total_pages_positive"),
-        Index("idx_templates_active_published", "is_active", "is_published"),
-        Index("idx_templates_type_genre", "template_type", "genre"),
-        Index("idx_templates_series", "series_id", "book_number"),
+        CheckConstraint("price >= 0", name="check_story_price_positive"),
+        CheckConstraint("total_pages > 0", name="check_story_total_pages_positive"),
+        Index("idx_story_templates_active_published", "is_active", "is_published"),
+        Index("idx_story_templates_genre", "genre"),
+        Index("idx_story_templates_series", "series_id", "book_number"),
         Index(
-            "idx_templates_search",
+            "idx_story_templates_search",
             text("to_tsvector('english', title || ' ' || description)"),
             postgresql_using="gin",
         ),
-        Index("idx_templates_tags", "tags", postgresql_using="gin"),
+        Index("idx_story_templates_tags", "tags", postgresql_using="gin"),
     )
 
     def __repr__(self) -> str:
-        return f"<BookTemplate(id={self.id}, title='{self.title}', type='{self.template_type}')>"
+        return f"<StoryBookTemplate(id={self.id}, title='{self.title}')>"

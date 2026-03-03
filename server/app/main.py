@@ -52,7 +52,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 # Create FastAPI application
 app = FastAPI(
     title=settings.APP_NAME,
-    description="StoryBloom - AI-Powered Children's Storybook Generation Platform",
+    description="PandaTales - AI-Powered Children's Coloring Book Generation Platform",
     version="1.0.0",
     docs_url="/docs" if settings.APP_ENV != "production" else None,
     redoc_url="/redoc" if settings.APP_ENV != "production" else None,
@@ -245,8 +245,8 @@ async def general_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content=error_response(
+            code="INTERNAL_ERROR",
             message="Internal server error",
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         ),
     )
 
@@ -280,7 +280,20 @@ app.include_router(api_router, prefix="/api")
 async def root():
     """Root endpoint"""
     return {
-        "message": "Welcome to StoryBloom API",
+        "message": "Welcome to PandaTales API",
         "docs": "/docs",
         "health": "/health",
     }
+
+
+# Run the application
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        "app.main:app",
+        host=settings.HOST,
+        port=settings.PORT,
+        reload=settings.APP_ENV != "production",
+        log_level="info",
+    )

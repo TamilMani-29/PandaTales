@@ -19,7 +19,7 @@
 
 ## Overview
 
-The Orders & Checkout API handles cart management, order creation, order tracking, and order history for Story Bloom.
+The Orders & Checkout API handles cart management, order creation, order tracking, and order history for Panda Tales.
 
 ### Features
 - Shopping cart management
@@ -100,7 +100,7 @@ Authorization: Bearer <access_token>
         "book": {
           "title": "Emma's First Adventure",
           "childName": "Emma",
-          "coverImage": "https://cdn.storybloom.com/books/book_xyz789_cover.jpg"
+          "coverImage": "https://cdn.pandatales.com/books/book_xyz789_cover.jpg"
         },
         "format": "digital",
         "quantity": 1,
@@ -114,7 +114,7 @@ Authorization: Bearer <access_token>
         "book": {
           "title": "Oliver's Magical Quest",
           "childName": "Oliver",
-          "coverImage": "https://cdn.storybloom.com/books/book_abc456_cover.jpg"
+          "coverImage": "https://cdn.pandatales.com/books/book_abc456_cover.jpg"
         },
         "format": "hardcover",
         "quantity": 1,
@@ -467,7 +467,7 @@ Authorization: Bearer <access_token>
         "quantity": 1,
         "unitPrice": 19.99,
         "totalPrice": 19.99,
-        "downloadUrl": "https://cdn.storybloom.com/downloads/..."
+        "downloadUrl": "https://cdn.pandatales.com/downloads/..."
       }
     ],
     "summary": {

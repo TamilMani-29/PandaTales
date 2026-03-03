@@ -1,0 +1,376 @@
+"""Storage Service for MinIO/S3 operations with comprehensive error handling"""
+
+import io
+from datetime import timedelta
+from pathlib import Path
+from typing import BinaryIO, Literal
+from uuid import UUID, uuid4
+
+from fastapi import UploadFile
+from minio import Minio
+from minio.error import S3Error
+
+from app.common.exceptions import (
+    BadRequestException,
+    NotFoundException,
+    ServiceUnavailableException,
+)
+from app.common.logging import get_logger
+from app.core.config import settings
+
+logger = get_logger(__name__)
+
+
+class StorageService:
+    """Service for handling file storage operations with MinIO/S3"""
+
+    def __init__(self):
+        """Initialize MinIO client"""
+        try:
+            self.client = Minio(
+                settings.MINIO_ENDPOINT,
+                access_key=settings.MINIO_ACCESS_KEY,
+                secret_key=settings.MINIO_SECRET_KEY,
+                secure=settings.MINIO_SECURE,
+            )
+            self.bucket = settings.MINIO_BUCKET
+            
+            # Verify bucket exists
+            if not self.client.bucket_exists(self.bucket):
+                logger.error("minio_bucket_missing", bucket=self.bucket)
+                raise ServiceUnavailableException(
+                    message="Storage service is not properly configured"
+                )
+                
+        except S3Error as e:
+            logger.error("minio_connection_error", error_code=e.code, error_message=str(e), exc_info=True)
+            raise ServiceUnavailableException(
+                message="Failed to connect to storage service"
+            )
+        except Exception as e:
+            logger.error("storage_init_error", error=str(e), exc_info=True)
+            raise ServiceUnavailableException(
+                message="Storage service initialization failed"
+            )
+
+    async def upload_file(
+        self,
+        file: UploadFile | BinaryIO,
+        object_name: str,
+        content_type: str | None = None,
+        max_size_mb: int | None = None,
+    ) -> str:
+        """
+        Upload file to MinIO with comprehensive error handling
+        
+        Args:
+            file: File to upload (UploadFile or BinaryIO)
+            object_name: Path/name in bucket (e.g., 'users/avatars/user123.jpg')
+            content_type: MIME type (auto-detected if None)
+            max_size_mb: Maximum file size in MB (None for no limit)
+            
+        Returns:
+            str: Object name/path of uploaded file
+            
+        Raises:
+            BadRequestException: Invalid file or size exceeded
+            ServiceUnavailableException: Upload failed
+        """
+        try:
+            # Handle UploadFile
+            if isinstance(file, UploadFile):
+                if content_type is None:
+                    content_type = file.content_type or "application/octet-stream"
+                
+                # Read file content
+                file_content = await file.read()
+                file_size = len(file_content)
+                
+                # Reset file pointer for potential re-reads
+                await file.seek(0)
+                
+            # Handle BinaryIO
+            else:
+                file_content = file.read()
+                file_size = len(file_content)
+                if content_type is None:
+                    content_type = "application/octet-stream"
+            
+            # Validate file size
+            if max_size_mb is not None:
+                max_size_bytes = max_size_mb * 1024 * 1024
+                if file_size > max_size_bytes:
+                    raise BadRequestException(
+                        message=f"File size exceeds maximum allowed size of {max_size_mb}MB"
+                    )
+            
+            if file_size == 0:
+                raise BadRequestException(message="File is empty")
+            
+            # Upload to MinIO
+            logger.info("uploading_file_to_minio", object_name=object_name, size_bytes=file_size, content_type=content_type)
+            
+            self.client.put_object(
+                bucket_name=self.bucket,
+                object_name=object_name,
+                data=io.BytesIO(file_content),
+                length=file_size,
+                content_type=content_type,
+            )
+            
+            logger.info("file_uploaded_successfully", object_name=object_name, size_bytes=file_size)
+            return object_name
+            
+        except BadRequestException:
+            # Re-raise validation errors
+            raise
+            
+        except S3Error as e:
+            logger.error(
+                "minio_upload_error",
+                object_name=object_name,
+                error_code=e.code,
+                error_message=e.message,
+                exc_info=True,
+            )
+            
+            if e.code == "NoSuchBucket":
+                raise ServiceUnavailableException(
+                    message="Storage bucket not found. Please contact support."
+                )
+            elif e.code == "AccessDenied":
+                raise ServiceUnavailableException(
+                    message="Storage access denied. Please contact support."
+                )
+            elif e.code == "EntityTooLarge":
+                raise BadRequestException(
+                    message="File is too large for storage system"
+                )
+            else:
+                raise ServiceUnavailableException(
+                    message="Failed to upload file. Please try again."
+                )
+                
+        except Exception as e:
+            logger.error("unexpected_upload_error", object_name=object_name, error=str(e), exc_info=True)
+            raise ServiceUnavailableException(
+                message="File upload failed due to unexpected error"
+            )
+
+    async def upload_image(
+        self,
+        file: UploadFile,
+        prefix: Literal["avatars", "photos", "covers", "pages", "previews", "samples"],
+        allowed_extensions: set[str] = {".jpg", ".jpeg", ".png", ".webp"},
+        max_size_mb: int = 10,
+        generate_filename: bool = True,
+    ) -> str:
+        """
+        Upload image file with validation and standardized naming
+        
+        Args:
+            file: Image file to upload
+            prefix: Storage prefix (determines path structure)
+            allowed_extensions: Allowed file extensions
+            max_size_mb: Maximum file size in MB
+            generate_filename: Whether to generate UUID-based filename
+            
+        Returns:
+            str: Object name/path of uploaded image
+            
+        Raises:
+            BadRequestException: Invalid image type or size
+            ServiceUnavailableException: Upload failed
+        """
+        try:
+            # Validate content type
+            if not file.content_type or not file.content_type.startswith("image/"):
+                raise BadRequestException(
+                    message=f"Invalid file type. Expected image, got: {file.content_type}"
+                )
+            
+            # Validate file extension
+            file_ext = Path(file.filename or "").suffix.lower()
+            if file_ext not in allowed_extensions:
+                raise BadRequestException(
+                    message=f"Invalid file extension. Allowed: {', '.join(allowed_extensions)}"
+                )
+            
+            # Generate object name based on prefix
+            if generate_filename:
+                filename = f"{uuid4()}{file_ext}"
+            else:
+                filename = file.filename or f"{uuid4()}{file_ext}"
+            
+            # Map prefix to storage path per MINIO_STORAGE_DESIGN.md
+            prefix_map = {
+                "avatars": "users/avatars",
+                "photos": "users/uploads/photos",
+                "covers": "generated/books/story/covers",  # Default to story
+                "pages": "generated/books/story/pages",
+                "previews": "templates/story-books/previews",
+                "samples": "templates/story-books/samples",
+            }
+            
+            object_name = f"{prefix_map[prefix]}/{filename}"
+            
+            # Upload file
+            return await self.upload_file(
+                file=file,
+                object_name=object_name,
+                content_type=file.content_type,
+                max_size_mb=max_size_mb,
+            )
+            
+        except BadRequestException:
+            raise
+        except Exception as e:
+            logger.error("image_upload_error", error=str(e), exc_info=True)
+            raise ServiceUnavailableException(
+                message="Image upload failed"
+            )
+
+    async def get_file_url(
+        self,
+        object_name: str,
+        expires: timedelta = timedelta(hours=1),
+    ) -> str:
+        """
+        Generate presigned URL for file access
+        
+        Args:
+            object_name: Path/name in bucket
+            expires: URL expiration time
+            
+        Returns:
+            str: Presigned URL
+            
+        Raises:
+            NotFoundException: File not found
+            ServiceUnavailableException: Failed to generate URL
+        """
+        try:
+            # Check if object exists
+            try:
+                self.client.stat_object(self.bucket, object_name)
+            except S3Error as e:
+                if e.code == "NoSuchKey":
+                    raise NotFoundException(
+                        message=f"File not found: {object_name}"
+                    )
+                raise
+            
+            # Generate presigned URL
+            url = self.client.presigned_get_object(
+                bucket_name=self.bucket,
+                object_name=object_name,
+                expires=expires,
+            )
+            
+            logger.info("generated_presigned_url", object_name=object_name, expires_seconds=int(expires.total_seconds()))
+            return url
+            
+        except NotFoundException:
+            raise
+            
+        except S3Error as e:
+            logger.error(
+                "minio_url_generation_error",
+                object_name=object_name,
+                error_code=e.code,
+                error_message=e.message,
+                exc_info=True,
+            )
+            raise ServiceUnavailableException(
+                message="Failed to generate file access URL"
+            )
+            
+        except Exception as e:
+            logger.error("unexpected_url_generation_error", object_name=object_name, error=str(e), exc_info=True)
+            raise ServiceUnavailableException(
+                message="Failed to generate file URL"
+            )
+
+    async def delete_file(self, object_name: str) -> bool:
+        """
+        Delete file from MinIO
+        
+        Args:
+            object_name: Path/name in bucket
+            
+        Returns:
+            bool: True if deleted successfully
+            
+        Raises:
+            ServiceUnavailableException: Deletion failed
+        """
+        try:
+            self.client.remove_object(self.bucket, object_name)
+            logger.info("file_deleted", object_name=object_name)
+            return True
+            
+        except S3Error as e:
+            if e.code == "NoSuchKey":
+                logger.warning("file_not_found_for_deletion", object_name=object_name)
+                return False
+                
+            logger.error(
+                "minio_delete_error",
+                object_name=object_name,
+                error_code=e.code,
+                error_message=e.message,
+                exc_info=True,
+            )
+            raise ServiceUnavailableException(
+                message="Failed to delete file"
+            )
+            
+        except Exception as e:
+            logger.error("unexpected_delete_error", object_name=object_name, error=str(e), exc_info=True)
+            raise ServiceUnavailableException(
+                message="File deletion failed"
+            )
+
+    async def file_exists(self, object_name: str) -> bool:
+        """
+        Check if file exists in MinIO
+        
+        Args:
+            object_name: Path/name in bucket
+            
+        Returns:
+            bool: True if file exists
+        """
+        try:
+            self.client.stat_object(self.bucket, object_name)
+            return True
+        except S3Error as e:
+            if e.code == "NoSuchKey":
+                return False
+            logger.error("file_exists_check_error", object_name=object_name, error=str(e), exc_info=True)
+            return False
+        except Exception as e:
+            logger.error("unexpected_file_exists_error", object_name=object_name, error=str(e), exc_info=True)
+            return False
+
+    async def get_public_url(self, object_name: str) -> str:
+        """
+        Get public URL for files in public paths (templates/*, public/*)
+        
+        Args:
+            object_name: Path/name in bucket
+            
+        Returns:
+            str: Public URL (no expiration)
+        """
+        # Per MINIO_STORAGE_DESIGN.md, public paths don't need presigned URLs
+        if object_name.startswith(("templates/", "public/")):
+            return f"http://{settings.MINIO_ENDPOINT}/{self.bucket}/{object_name}"
+        else:
+            # For private files, return presigned URL with 7-day expiration
+            return await self.get_file_url(object_name, expires=timedelta(days=7))
+
+
+def get_storage_service() -> StorageService:
+    """Dependency for FastAPI endpoints"""
+    return StorageService()

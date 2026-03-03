@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Database migration script for StoryBloom
+# Database migration script for PandaTales
 
 set -e
 
 echo "================================"
-echo "StoryBloom Database Migration"
+echo "PandaTales Database Migration"
 echo "================================"
 echo ""
 

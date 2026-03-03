@@ -1,4 +1,4 @@
-# Quick Start Guide for StoryBloom Backend
+# Quick Start Guide for PandaTales Backend
 
 ## 🚀 Get Started in 5 Minutes
 

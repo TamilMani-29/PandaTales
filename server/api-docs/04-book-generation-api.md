@@ -265,7 +265,7 @@ Authorization: Bearer <access_token>
         "childName": "Emma",
         "childId": "child_abc123",
         "status": "preview",
-        "coverImage": "https://cdn.storybloom.com/books/book_xyz789_cover.jpg",
+        "coverImage": "https://cdn.pandatales.com/books/book_xyz789_cover.jpg",
         "isPurchased": false,
         "generatedAt": "2026-02-14T10:35:00Z",
         "previewUrl": "/preview/book_xyz789"
@@ -277,7 +277,7 @@ Authorization: Bearer <access_token>
         "childName": "Oliver",
         "childId": "child_def456",
         "status": "purchased",
-        "coverImage": "https://cdn.storybloom.com/books/book_abc456_cover.jpg",
+        "coverImage": "https://cdn.pandatales.com/books/book_abc456_cover.jpg",
         "isPurchased": true,
         "purchasedAt": "2026-02-10T14:20:00Z",
         "generatedAt": "2026-02-10T11:15:00Z",
@@ -332,17 +332,17 @@ Authorization: Bearer <access_token>
     },
     "status": "preview",
     "isPurchased": false,
-    "coverImage": "https://cdn.storybloom.com/books/book_xyz789_cover.jpg",
+    "coverImage": "https://cdn.pandatales.com/books/book_xyz789_cover.jpg",
     "totalPages": 20,
     "previewPages": [
       {
         "pageNumber": 1,
-        "imageUrl": "https://cdn.storybloom.com/books/book_xyz789_p1.jpg",
+        "imageUrl": "https://cdn.pandatales.com/books/book_xyz789_p1.jpg",
         "text": "Once upon a time, Emma went on an amazing adventure..."
       },
       {
         "pageNumber": 2,
-        "imageUrl": "https://cdn.storybloom.com/books/book_xyz789_p2.jpg",
+        "imageUrl": "https://cdn.pandatales.com/books/book_xyz789_p2.jpg",
         "text": "Emma discovered a magical door..."
       }
     ],

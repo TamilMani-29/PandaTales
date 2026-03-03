@@ -3,10 +3,11 @@
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, File, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common import get_logger, success_response
+from app.common.exceptions import BadRequestException, ServiceUnavailableException
 from app.db.session import get_db
 from app.schemas.user import (
     AccountDeletionRequest,
@@ -15,6 +16,7 @@ from app.schemas.user import (
     UserUpdate,
 )
 from app.services.user import UserService
+from app.services.storage import StorageService
 
 logger = get_logger(__name__)
 
@@ -82,28 +84,64 @@ async def update_user_profile(
     response_model=dict[str, Any],
     status_code=status.HTTP_200_OK,
     summary="Upload avatar",
-    description="Upload or update user avatar image",
+    description="Upload or update user avatar image (max 5MB, jpg/png/webp)",
 )
 async def upload_avatar(
-    # TODO: Add file upload parameter
-    # file: UploadFile = File(...),
+    file: UploadFile = File(..., description="Avatar image file"),
     user_id: UUID = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """Upload user avatar"""
-    # TODO: Implement file upload to storage (MinIO/S3)
-    # For now, return a placeholder
-    avatar_url = "https://cdn.storybloom.com/avatars/placeholder.jpg"
-
-    service = UserService(db)
-    await service.update_avatar(user_id, avatar_url)
-
-    response_data = AvatarUploadResponse(avatar_url=avatar_url)
-
-    return success_response(
-        data=response_data.model_dump(),
-        message="Avatar uploaded successfully",
-    )
+    """Upload user avatar to MinIO with proper error handling"""
+    
+    # Initialize storage service
+    storage_service = StorageService()
+    
+    try:
+        # Upload avatar with validation (max 5MB per config)
+        object_name = await storage_service.upload_image(
+            file=file,
+            prefix="avatars",
+            max_size_mb=5,
+        )
+        
+        # Generate URL for the uploaded avatar
+        # For avatars, use presigned URL (private storage)
+        avatar_url = await storage_service.get_file_url(object_name)
+        
+        # Update user's avatar in database
+        service = UserService(db)
+        await service.update_avatar(user_id, object_name)
+        
+        response_data = AvatarUploadResponse(avatar_url=avatar_url)
+        
+        return success_response(
+            data=response_data.model_dump(),
+            message="Avatar uploaded successfully",
+        )
+        
+    except BadRequestException as e:
+        logger.warning(f"Avatar upload validation failed for user {user_id}: {e.message}")
+        return success_response(
+            data=None,
+            message=e.message,
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+        
+    except ServiceUnavailableException as e:
+        logger.error(f"Avatar upload failed for user {user_id}: {e.message}")
+        return success_response(
+            data=None,
+            message="Failed to upload avatar. Please try again.",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+        
+    except Exception as e:
+        logger.error(f"Unexpected error during avatar upload for user {user_id}: {e}", exc_info=True)
+        return success_response(
+            data=None,
+            message="An unexpected error occurred. Please try again.",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
 
 @router.delete(

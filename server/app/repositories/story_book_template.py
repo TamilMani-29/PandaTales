@@ -1,4 +1,4 @@
-"""Book Template Repository - Data Access Layer"""
+"""Story Book Template Repository - Data Access Layer"""
 
 from typing import Sequence
 from uuid import UUID
@@ -7,24 +7,30 @@ from sqlalchemy import Select, and_, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.exceptions import NotFoundException
-from app.models.book_template import BookTemplate
-from app.schemas.book_template import BookTemplateCreate, BookTemplateFilters, BookTemplateUpdate
+from app.models.story_book_template import StoryBookTemplate
+from app.schemas.story_book_template import (
+    StoryBookTemplateCreate,
+    StoryBookTemplateFilters,
+    StoryBookTemplateUpdate,
+)
 
 
-class BookTemplateRepository:
-    """Repository for book template data access"""
+class StoryBookTemplateRepository:
+    """Repository for story book template data access"""
 
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_by_id(self, template_id: UUID, include_inactive: bool = False) -> BookTemplate:
+    async def get_by_id(
+        self, template_id: UUID, include_inactive: bool = False
+    ) -> StoryBookTemplate:
         """Get template by ID"""
-        query = select(BookTemplate).where(BookTemplate.id == template_id)
+        query = select(StoryBookTemplate).where(StoryBookTemplate.id == template_id)
 
         if not include_inactive:
             query = query.where(
-                BookTemplate.is_active == True,
-                BookTemplate.is_published == True,
+                StoryBookTemplate.is_active == True,
+                StoryBookTemplate.is_published == True,
             )
 
         result = await self.db.execute(query)
@@ -32,8 +38,8 @@ class BookTemplateRepository:
 
         if not template:
             raise NotFoundException(
-                message="Book template not found",
-                error_code="TEMPLATE_NOT_FOUND",
+                message="Story book template not found",
+                error_code="STORY_TEMPLATE_NOT_FOUND",
                 details={"template_id": str(template_id)},
             )
 
@@ -41,56 +47,52 @@ class BookTemplateRepository:
 
     async def get_all(
         self,
-        filters: BookTemplateFilters | None = None,
+        filters: StoryBookTemplateFilters | None = None,
         include_inactive: bool = False,
-    ) -> Select[tuple[BookTemplate]]:
+    ) -> Select[tuple[StoryBookTemplate]]:
         """Get all templates with optional filters - returns query for pagination"""
-        query = select(BookTemplate)
+        query = select(StoryBookTemplate)
 
         # Base filters
         conditions = []
         if not include_inactive:
             conditions.extend(
                 [
-                    BookTemplate.is_active == True,
-                    BookTemplate.is_published == True,
+                    StoryBookTemplate.is_active == True,
+                    StoryBookTemplate.is_published == True,
                 ]
             )
 
         if filters:
-            # Template type filter
-            if filters.template_type:
-                conditions.append(BookTemplate.template_type == filters.template_type)
-
             # Genre filter
             if filters.genre:
-                conditions.append(BookTemplate.genre == filters.genre)
+                conditions.append(StoryBookTemplate.genre == filters.genre)
 
             # Age group filter
             if filters.age_group:
-                conditions.append(BookTemplate.age_group == filters.age_group)
+                conditions.append(StoryBookTemplate.age_group == filters.age_group)
 
-            # Difficulty filter
-            if filters.difficulty:
-                conditions.append(BookTemplate.difficulty == filters.difficulty)
+            # Reading level filter
+            if filters.reading_level:
+                conditions.append(StoryBookTemplate.reading_level == filters.reading_level)
 
             # Price range filter
             if filters.min_price is not None:
-                conditions.append(BookTemplate.price >= filters.min_price)
+                conditions.append(StoryBookTemplate.price >= filters.min_price)
             if filters.max_price is not None:
-                conditions.append(BookTemplate.price <= filters.max_price)
+                conditions.append(StoryBookTemplate.price <= filters.max_price)
 
             # Tags filter (contains any of the tags)
             if filters.tags:
-                conditions.append(BookTemplate.tags.contains(filters.tags))
+                conditions.append(StoryBookTemplate.tags.contains(filters.tags))
 
             # Full-text search
             if filters.search:
                 search_term = f"%{filters.search}%"
                 conditions.append(
                     or_(
-                        BookTemplate.title.ilike(search_term),
-                        BookTemplate.description.ilike(search_term),
+                        StoryBookTemplate.title.ilike(search_term),
+                        StoryBookTemplate.description.ilike(search_term),
                     )
                 )
 
@@ -99,19 +101,19 @@ class BookTemplateRepository:
 
         # Sorting
         if filters:
-            sort_column = getattr(BookTemplate, filters.sort_by)
+            sort_column = getattr(StoryBookTemplate, filters.sort_by)
             if filters.sort_order == "desc":
                 query = query.order_by(desc(sort_column))
             else:
                 query = query.order_by(sort_column)
         else:
-            query = query.order_by(desc(BookTemplate.created_at))
+            query = query.order_by(desc(StoryBookTemplate.created_at))
 
         return query
 
-    async def create(self, template_data: BookTemplateCreate) -> BookTemplate:
-        """Create a new book template"""
-        template = BookTemplate(**template_data.model_dump())
+    async def create(self, template_data: StoryBookTemplateCreate) -> StoryBookTemplate:
+        """Create a new story book template"""
+        template = StoryBookTemplate(**template_data.model_dump())
         self.db.add(template)
         await self.db.commit()
         await self.db.refresh(template)
@@ -120,9 +122,9 @@ class BookTemplateRepository:
     async def update(
         self,
         template_id: UUID,
-        template_data: BookTemplateUpdate,
-    ) -> BookTemplate:
-        """Update a book template"""
+        template_data: StoryBookTemplateUpdate,
+    ) -> StoryBookTemplate:
+        """Update a story book template"""
         template = await self.get_by_id(template_id, include_inactive=True)
 
         # Update only provided fields
@@ -135,31 +137,31 @@ class BookTemplateRepository:
         return template
 
     async def delete(self, template_id: UUID) -> None:
-        """Soft delete a book template"""
+        """Soft delete a story book template"""
         template = await self.get_by_id(template_id, include_inactive=True)
         template.is_active = False
         await self.db.commit()
 
-    async def get_by_genre(self, genre: str) -> Sequence[BookTemplate]:
+    async def get_by_genre(self, genre: str) -> Sequence[StoryBookTemplate]:
         """Get all templates by genre"""
-        query = select(BookTemplate).where(
-            BookTemplate.genre == genre,
-            BookTemplate.is_active == True,
-            BookTemplate.is_published == True,
+        query = select(StoryBookTemplate).where(
+            StoryBookTemplate.genre == genre,
+            StoryBookTemplate.is_active == True,
+            StoryBookTemplate.is_published == True,
         )
         result = await self.db.execute(query)
         return result.scalars().all()
 
-    async def get_by_series(self, series_id: UUID) -> Sequence[BookTemplate]:
+    async def get_by_series(self, series_id: UUID) -> Sequence[StoryBookTemplate]:
         """Get all templates in a series"""
         query = (
-            select(BookTemplate)
+            select(StoryBookTemplate)
             .where(
-                BookTemplate.series_id == series_id,
-                BookTemplate.is_active == True,
-                BookTemplate.is_published == True,
+                StoryBookTemplate.series_id == series_id,
+                StoryBookTemplate.is_active == True,
+                StoryBookTemplate.is_published == True,
             )
-            .order_by(BookTemplate.book_number)
+            .order_by(StoryBookTemplate.book_number)
         )
         result = await self.db.execute(query)
         return result.scalars().all()
@@ -167,18 +169,18 @@ class BookTemplateRepository:
     async def get_genres(self) -> list[str]:
         """Get all unique genres"""
         query = (
-            select(BookTemplate.genre)
+            select(StoryBookTemplate.genre)
             .where(
-                BookTemplate.is_active == True,
-                BookTemplate.is_published == True,
+                StoryBookTemplate.is_active == True,
+                StoryBookTemplate.is_published == True,
             )
             .distinct()
-            .order_by(BookTemplate.genre)
+            .order_by(StoryBookTemplate.genre)
         )
         result = await self.db.execute(query)
         return list(result.scalars().all())
 
-    async def get_count(self, filters: BookTemplateFilters | None = None) -> int:
+    async def get_count(self, filters: StoryBookTemplateFilters | None = None) -> int:
         """Get total count of templates matching filters"""
         query = await self.get_all(filters)
         count_query = select(func.count()).select_from(query.subquery())

@@ -57,15 +57,15 @@ Authorization: Bearer <access_token>
     "previewPages": [
       {
         "pageNumber": 1,
-        "imageUrl": "https://cdn.storybloom.com/books/book_xyz789_preview_p1.jpg",
-        "thumbnailUrl": "https://cdn.storybloom.com/books/book_xyz789_preview_p1_thumb.jpg",
+        "imageUrl": "https://cdn.pandatales.com/books/book_xyz789_preview_p1.jpg",
+        "thumbnailUrl": "https://cdn.pandatales.com/books/book_xyz789_preview_p1_thumb.jpg",
         "text": "Once upon a time, in a colorful world, lived a brave little hero named Emma...",
         "hasWatermark": true
       },
       {
         "pageNumber": 2,
-        "imageUrl": "https://cdn.storybloom.com/books/book_xyz789_preview_p2.jpg",
-        "thumbnailUrl": "https://cdn.storybloom.com/books/book_xyz789_preview_p2_thumb.jpg",
+        "imageUrl": "https://cdn.pandatales.com/books/book_xyz789_preview_p2.jpg",
+        "thumbnailUrl": "https://cdn.pandatales.com/books/book_xyz789_preview_p2_thumb.jpg",
         "text": "One sunny morning, Emma discovered a mysterious map...",
         "hasWatermark": true
       }
@@ -73,7 +73,7 @@ Authorization: Bearer <access_token>
     "lockedPages": [
       {
         "pageNumber": 3,
-        "thumbnailUrl": "https://cdn.storybloom.com/books/book_xyz789_locked_p3_thumb.jpg",
+        "thumbnailUrl": "https://cdn.pandatales.com/books/book_xyz789_locked_p3_thumb.jpg",
         "isBlurred": true
       }
       // ... remaining pages (blurred thumbnails)
@@ -121,7 +121,7 @@ Content-Length: 1234567
 ```
 
 **Features:**
-- Watermarked with "PREVIEW - Unlock Full Book at StoryBloom.com"
+- Watermarked with "PREVIEW - Unlock Full Book at pandatales.com"
 - Only first 2 pages included
 - Optimized file size
 - Expires in 24 hours (signed URL)
@@ -198,7 +198,7 @@ Authorization: Bearer <access_token>
 {
   "success": true,
   "data": {
-    "downloadUrl": "https://cdn.storybloom.com/downloads/book_xyz789.pdf?token=eyJhbG...",
+    "downloadUrl": "https://cdn.pandatales.com/downloads/book_xyz789.pdf?token=eyJhbG...",
     "expiresAt": "2026-02-14T11:30:00Z",
     "expiresIn": 3600,
     "format": "pdf",
@@ -244,8 +244,8 @@ Authorization: Bearer <access_token>
     "pages": [
       {
         "pageNumber": 1,
-        "imageUrl": "https://cdn.storybloom.com/books/book_xyz789_full_p1_high.jpg",
-        "thumbnailUrl": "https://cdn.storybloom.com/books/book_xyz789_full_p1_thumb.jpg",
+        "imageUrl": "https://cdn.pandatales.com/books/book_xyz789_full_p1_high.jpg",
+        "thumbnailUrl": "https://cdn.pandatales.com/books/book_xyz789_full_p1_thumb.jpg",
         "text": "Once upon a time...",
         "hasWatermark": false
       }
@@ -261,7 +261,7 @@ Authorization: Bearer <access_token>
   "success": true,
   "data": {
     "pageNumber": 5,
-    "imageUrl": "https://cdn.storybloom.com/books/book_xyz789_full_p5_high.jpg",
+    "imageUrl": "https://cdn.pandatales.com/books/book_xyz789_full_p5_high.jpg",
     "text": "Emma continued her journey...",
     "nextPage": 6,
     "prevPage": 4
@@ -386,14 +386,14 @@ class DownloadRecord:
 ### Preview Watermark Specifications
 
 **Text Watermark:**
-- Content: "PREVIEW - Unlock at StoryBloom.com"
+- Content: "PREVIEW - Unlock at pandatales.com"
 - Position: Diagonal across center
 - Opacity: 15%
 - Font: Arial, 48pt
 - Color: Gray (#808080)
 
 **Visual Watermark:**
-- Story Bloom logo in corner
+- Panda Tales logo in corner
 - Opacity: 20%
 - Size: 100x100px
 - Position: Bottom right
@@ -433,7 +433,7 @@ def apply_watermark(image: Image, text: str) -> Image:
 
 ### S3 Bucket Structure
 ```
-storybloom-books/
+pandatales-books/
 ├── previews/
 │   ├── book_xyz789_preview_p1.jpg
 │   ├── book_xyz789_preview_p1_thumb.jpg
@@ -463,7 +463,7 @@ def generate_signed_download_url(
     """
     Generate CloudFront signed URL for secure downloads
     """
-    url = f"https://cdn.storybloom.com/books/full/{book_id}_full.pdf"
+    url = f"https://cdn.pandatales.com/books/full/{book_id}_full.pdf"
     
     signer = CloudFrontSigner(KEY_ID, PRIVATE_KEY_LOADER)
     signed_url = signer.generate_presigned_url(

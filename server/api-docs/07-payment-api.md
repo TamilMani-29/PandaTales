@@ -21,7 +21,7 @@
 
 ## Overview
 
-The Payment Processing API integrates with Stripe to handle secure payment processing for Story Bloom.
+The Payment Processing API integrates with Stripe to handle secure payment processing for Panda Tales.
 
 ### Features
 - Stripe Payment Intents integration
@@ -695,7 +695,7 @@ class Refund:
 
 ### PCI Compliance
 
-Story Bloom follows PCI DSS compliance:
+Panda Tales follows PCI DSS compliance:
 
 1. **Never Store Card Data**
    - All card data handled by Stripe

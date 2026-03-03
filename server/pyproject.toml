@@ -1,7 +1,7 @@
 [project]
-name = "storybloom-api"
+name = "pandatales-api"
 version = "0.1.0"
-description = "Story Bloom Backend API - Personalized Children's Book Platform"
+description = "Panda Tales Backend API - Personalized Children's Book Platform"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

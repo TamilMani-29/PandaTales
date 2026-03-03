@@ -17,7 +17,7 @@
 
 ## Overview
 
-The Authentication API handles user registration, login, OAuth integration, and session management for Story Bloom.
+The Authentication API handles user registration, login, OAuth integration, and session management for Panda Tales.
 
 ### Features
 - Email/password registration and login
@@ -441,7 +441,7 @@ Authorization: Bearer <access_token>
 
 Redirects to frontend with tokens:
 ```
-https://storybloom.com/auth/callback?
+https://pandatales.com/auth/callback?
   access_token=eyJhbG...&
   refresh_token=eyJhbG...&
   user_id=usr_123
@@ -449,7 +449,7 @@ https://storybloom.com/auth/callback?
 
 Or error:
 ```
-https://storybloom.com/auth/callback?error=access_denied
+https://pandatales.com/auth/callback?error=access_denied
 ```
 
 ---
@@ -613,7 +613,7 @@ GOOGLE_REDIRECT_URI=http://localhost:8000/api/v1/auth/oauth/google/callback
 # Email
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
-SMTP_USER=noreply@storybloom.com
+SMTP_USER=noreply@pandatales.com
 SMTP_PASSWORD=xxx
 ```
 

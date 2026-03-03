@@ -1,9 +1,9 @@
-# 🚀 Story Bloom -- Frontend Application Prompt (For bolt.new)
+# 🚀 Panda Tales -- Frontend Application Prompt (For bolt.new)
 
 Build a production-ready enterprise-grade Next.js (App Router) frontend
 application named:
 
-# 🌸 Story Bloom
+# 🐼 Panda Tales
 
 This application is strictly a frontend client application.
 

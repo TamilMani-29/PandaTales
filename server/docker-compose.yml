@@ -1,31 +1,45 @@
+# Docker Compose Configuration for PandaTales
+#
+# Usage with profiles:
+#   Run only PostgreSQL:  docker-compose --profile postgres up
+#   Run only MinIO:       docker-compose --profile minio up
+#   Run both:             docker-compose --profile postgres --profile minio up
+#   Run everything:       docker-compose --profile all up
+#   Run API (includes all deps): docker-compose --profile api up
+#
+# Stop services: docker-compose down
+# Stop and remove volumes: docker-compose down -v
+
 version: '3.8'
 
 services:
   # PostgreSQL Database
   postgres:
+    profiles: ["postgres", "all"]
     image: postgres:15-alpine
-    container_name: storybloom_postgres
+    container_name: pandatales_postgres
     environment:
-      POSTGRES_USER: storybloom
-      POSTGRES_PASSWORD: storybloom_dev_password
-      POSTGRES_DB: storybloom
+      POSTGRES_USER: pandatales
+      POSTGRES_PASSWORD: pandatales_dev_password
+      POSTGRES_DB: pandatales
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U storybloom"]
+      test: ["CMD-SHELL", "pg_isready -U pandatales"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - storybloom_network
+      - pandatales_network
 
   # MinIO Object Storage
   minio:
+    profiles: ["minio", "all"]
     image: minio/minio:latest
-    container_name: storybloom_minio
+    container_name: pandatales_minio
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin123
@@ -41,23 +55,24 @@ services:
       timeout: 20s
       retries: 3
     networks:
-      - storybloom_network
+      - pandatales_network
 
   # FastAPI Application
   api:
+    profiles: ["api", "all"]
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: storybloom_api
+    container_name: pandatales_api
     environment:
       # Database
-      DATABASE_URL: postgresql+asyncpg://storybloom:storybloom_dev_password@postgres:5432/storybloom
+      DATABASE_URL: postgresql+asyncpg://pandatales:pandatales_dev_password@postgres:5432/pandatales
       
       # MinIO
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin123
-      MINIO_BUCKET_NAME: storybloom
+      MINIO_BUCKET: pandatales
       MINIO_USE_SSL: "false"
       
       # JWT
@@ -89,7 +104,7 @@ services:
       minio:
         condition: service_healthy
     networks:
-      - storybloom_network
+      - pandatales_network
     command: >
       sh -c "
         echo 'Waiting for services to be ready...' &&
@@ -107,5 +122,5 @@ volumes:
     driver: local
 
 networks:
-  storybloom_network:
+  pandatales_network:
     driver: bridge

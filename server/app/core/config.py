@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     )
 
     # Application
-    APP_NAME: str = "Story Bloom API"
+    APP_NAME: str = "Panda Tales API"
     APP_ENV: Literal["development", "staging", "production"] = "development"
     DEBUG: bool = True
     API_VERSION: str = "v1"
@@ -54,8 +54,8 @@ class Settings(BaseSettings):
     # MinIO
     MINIO_ENDPOINT: str = "localhost:9000"
     MINIO_ACCESS_KEY: str = "minioadmin"
-    MINIO_SECRET_KEY: str = "minioadmin"
-    MINIO_BUCKET: str = "storybloom-files"
+    MINIO_SECRET_KEY: str = "minioadmin123"
+    MINIO_BUCKET: str = "pandatales"
     MINIO_SECURE: bool = False
     MINIO_REGION: str = "us-east-1"
 
@@ -63,7 +63,7 @@ class Settings(BaseSettings):
     AWS_ACCESS_KEY_ID: str = ""
     AWS_SECRET_ACCESS_KEY: str = ""
     AWS_REGION: str = "us-east-1"
-    S3_BUCKET: str = "storybloom-files"
+    S3_BUCKET: str = "pandatales-files"
 
     # Celery (Optional)
     CELERY_BROKER_URL: str | None = None
@@ -84,8 +84,8 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
-    SMTP_FROM_EMAIL: str = "noreply@storybloom.com"
-    SMTP_FROM_NAME: str = "Story Bloom"
+    SMTP_FROM_EMAIL: str = "noreply@pandatales.com"
+    SMTP_FROM_NAME: str = "Panda Tales"
 
     # Rate Limiting
     RATE_LIMIT_ENABLED: bool = True

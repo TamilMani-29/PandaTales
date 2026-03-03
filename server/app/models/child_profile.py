@@ -21,6 +21,7 @@ from app.models.base import BaseModel, SoftDeleteMixin
 
 if TYPE_CHECKING:
     from app.models.user import User
+    from app.models.generated_book import GeneratedBook
 
 
 class ChildProfile(Base, BaseModel, SoftDeleteMixin):
@@ -58,6 +59,11 @@ class ChildProfile(Base, BaseModel, SoftDeleteMixin):
     user: Mapped["User"] = relationship(
         "User",
         back_populates="children",
+    )
+
+    generated_books: Mapped[list["GeneratedBook"]] = relationship(
+        "GeneratedBook",
+        back_populates="child",
     )
 
     # Table constraints

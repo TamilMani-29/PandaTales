@@ -1657,6 +1657,110 @@ wheels = [
 ]
 
 [[package]]
+name = "pandatales-api"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "alembic" },
+    { name = "asyncpg" },
+    { name = "authlib" },
+    { name = "boto3" },
+    { name = "celery" },
+    { name = "email-validator" },
+    { name = "fastapi" },
+    { name = "fastapi-mail" },
+    { name = "flower" },
+    { name = "httpx" },
+    { name = "jinja2" },
+    { name = "langchain" },
+    { name = "minio" },
+    { name = "openai" },
+    { name = "orjson" },
+    { name = "passlib", extra = ["bcrypt"] },
+    { name = "phonenumbers" },
+    { name = "pillow" },
+    { name = "psycopg2-binary" },
+    { name = "pydantic", extra = ["email"] },
+    { name = "pydantic-settings" },
+    { name = "pypdf" },
+    { name = "python-dotenv" },
+    { name = "python-jose", extra = ["cryptography"] },
+    { name = "python-json-logger" },
+    { name = "python-magic" },
+    { name = "python-multipart" },
+    { name = "python-slugify" },
+    { name = "pyyaml" },
+    { name = "reportlab" },
+    { name = "sqlalchemy", extra = ["asyncio"] },
+    { name = "stripe" },
+    { name = "structlog" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "black" },
+    { name = "factory-boy" },
+    { name = "faker" },
+    { name = "httpx" },
+    { name = "mypy" },
+    { name = "pre-commit" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "alembic", specifier = ">=1.13.0" },
+    { name = "asyncpg", specifier = ">=0.29.0" },
+    { name = "authlib", specifier = ">=1.3.0" },
+    { name = "black", marker = "extra == 'dev'", specifier = ">=24.1.0" },
+    { name = "boto3", specifier = ">=1.34.0" },
+    { name = "celery", specifier = ">=5.3.4" },
+    { name = "email-validator", specifier = ">=2.1.0" },
+    { name = "factory-boy", marker = "extra == 'dev'", specifier = ">=3.3.0" },
+    { name = "faker", marker = "extra == 'dev'", specifier = ">=22.6.0" },
+    { name = "fastapi", specifier = ">=0.109.0" },
+    { name = "fastapi-mail", specifier = ">=1.4.1" },
+    { name = "flower", specifier = ">=2.0.1" },
+    { name = "httpx", specifier = ">=0.26.0" },
+    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.26.0" },
+    { name = "jinja2", specifier = ">=3.1.3" },
+    { name = "langchain", specifier = ">=0.1.0" },
+    { name = "minio", specifier = ">=7.2.0" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.8.0" },
+    { name = "openai", specifier = ">=1.10.0" },
+    { name = "orjson", specifier = ">=3.9.13" },
+    { name = "passlib", extras = ["bcrypt"], specifier = ">=1.7.4" },
+    { name = "phonenumbers", specifier = ">=8.13.27" },
+    { name = "pillow", specifier = ">=10.2.0" },
+    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.6.0" },
+    { name = "psycopg2-binary", specifier = ">=2.9.9" },
+    { name = "pydantic", extras = ["email"], specifier = ">=2.5.0" },
+    { name = "pydantic-settings", specifier = ">=2.1.0" },
+    { name = "pypdf", specifier = ">=3.17.4" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.4.4" },
+    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23.3" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1.0" },
+    { name = "python-dotenv", specifier = ">=1.0.0" },
+    { name = "python-jose", extras = ["cryptography"], specifier = ">=3.3.0" },
+    { name = "python-json-logger", specifier = ">=2.0.7" },
+    { name = "python-magic", specifier = ">=0.4.27" },
+    { name = "python-multipart", specifier = ">=0.0.6" },
+    { name = "python-slugify", specifier = ">=8.0.2" },
+    { name = "pyyaml", specifier = ">=6.0.1" },
+    { name = "reportlab", specifier = ">=4.0.9" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.14" },
+    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.25" },
+    { name = "stripe", specifier = ">=7.10.0" },
+    { name = "structlog", specifier = ">=24.1.0" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.27.0" },
+]
+provides-extras = ["dev"]
+
+[[package]]
 name = "passlib"
 version = "1.7.4"
 source = { registry = "https://pypi.org/simple" }
@@ -2564,110 +2668,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/c4/68/79977123bb7be889a
 wheels = [
     { url = "https://files.pythonhosted.org/packages/81/0d/13d1d239a25cbfb19e740db83143e95c772a1fe10202dda4b76792b114dd/starlette-0.52.1-py3-none-any.whl", hash = "sha256:0029d43eb3d273bc4f83a08720b4912ea4b071087a3b48db01b7c839f7954d74", size = 74272, upload-time = "2026-01-18T13:34:09.188Z" },
 ]
-
-[[package]]
-name = "storybloom-api"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "alembic" },
-    { name = "asyncpg" },
-    { name = "authlib" },
-    { name = "boto3" },
-    { name = "celery" },
-    { name = "email-validator" },
-    { name = "fastapi" },
-    { name = "fastapi-mail" },
-    { name = "flower" },
-    { name = "httpx" },
-    { name = "jinja2" },
-    { name = "langchain" },
-    { name = "minio" },
-    { name = "openai" },
-    { name = "orjson" },
-    { name = "passlib", extra = ["bcrypt"] },
-    { name = "phonenumbers" },
-    { name = "pillow" },
-    { name = "psycopg2-binary" },
-    { name = "pydantic", extra = ["email"] },
-    { name = "pydantic-settings" },
-    { name = "pypdf" },
-    { name = "python-dotenv" },
-    { name = "python-jose", extra = ["cryptography"] },
-    { name = "python-json-logger" },
-    { name = "python-magic" },
-    { name = "python-multipart" },
-    { name = "python-slugify" },
-    { name = "pyyaml" },
-    { name = "reportlab" },
-    { name = "sqlalchemy", extra = ["asyncio"] },
-    { name = "stripe" },
-    { name = "structlog" },
-    { name = "uvicorn", extra = ["standard"] },
-]
-
-[package.optional-dependencies]
-dev = [
-    { name = "black" },
-    { name = "factory-boy" },
-    { name = "faker" },
-    { name = "httpx" },
-    { name = "mypy" },
-    { name = "pre-commit" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "alembic", specifier = ">=1.13.0" },
-    { name = "asyncpg", specifier = ">=0.29.0" },
-    { name = "authlib", specifier = ">=1.3.0" },
-    { name = "black", marker = "extra == 'dev'", specifier = ">=24.1.0" },
-    { name = "boto3", specifier = ">=1.34.0" },
-    { name = "celery", specifier = ">=5.3.4" },
-    { name = "email-validator", specifier = ">=2.1.0" },
-    { name = "factory-boy", marker = "extra == 'dev'", specifier = ">=3.3.0" },
-    { name = "faker", marker = "extra == 'dev'", specifier = ">=22.6.0" },
-    { name = "fastapi", specifier = ">=0.109.0" },
-    { name = "fastapi-mail", specifier = ">=1.4.1" },
-    { name = "flower", specifier = ">=2.0.1" },
-    { name = "httpx", specifier = ">=0.26.0" },
-    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.26.0" },
-    { name = "jinja2", specifier = ">=3.1.3" },
-    { name = "langchain", specifier = ">=0.1.0" },
-    { name = "minio", specifier = ">=7.2.0" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.8.0" },
-    { name = "openai", specifier = ">=1.10.0" },
-    { name = "orjson", specifier = ">=3.9.13" },
-    { name = "passlib", extras = ["bcrypt"], specifier = ">=1.7.4" },
-    { name = "phonenumbers", specifier = ">=8.13.27" },
-    { name = "pillow", specifier = ">=10.2.0" },
-    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.6.0" },
-    { name = "psycopg2-binary", specifier = ">=2.9.9" },
-    { name = "pydantic", extras = ["email"], specifier = ">=2.5.0" },
-    { name = "pydantic-settings", specifier = ">=2.1.0" },
-    { name = "pypdf", specifier = ">=3.17.4" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.4.4" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23.3" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1.0" },
-    { name = "python-dotenv", specifier = ">=1.0.0" },
-    { name = "python-jose", extras = ["cryptography"], specifier = ">=3.3.0" },
-    { name = "python-json-logger", specifier = ">=2.0.7" },
-    { name = "python-magic", specifier = ">=0.4.27" },
-    { name = "python-multipart", specifier = ">=0.0.6" },
-    { name = "python-slugify", specifier = ">=8.0.2" },
-    { name = "pyyaml", specifier = ">=6.0.1" },
-    { name = "reportlab", specifier = ">=4.0.9" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.14" },
-    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0.25" },
-    { name = "stripe", specifier = ">=7.10.0" },
-    { name = "structlog", specifier = ">=24.1.0" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.27.0" },
-]
-provides-extras = ["dev"]
 
 [[package]]
 name = "stripe"

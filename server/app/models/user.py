@@ -19,6 +19,7 @@ from app.models.base import BaseModel, SoftDeleteMixin
 if TYPE_CHECKING:
     from app.models.child_profile import ChildProfile
     from app.models.address import Address
+    from app.models.generated_book import GeneratedBook
 
 
 class User(Base, BaseModel, SoftDeleteMixin):
@@ -77,6 +78,13 @@ class User(Base, BaseModel, SoftDeleteMixin):
 
     addresses: Mapped[list["Address"]] = relationship(
         "Address",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+
+    generated_books: Mapped[list["GeneratedBook"]] = relationship(
+        "GeneratedBook",
         back_populates="user",
         cascade="all, delete-orphan",
         lazy="selectin",

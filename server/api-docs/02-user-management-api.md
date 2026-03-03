@@ -50,7 +50,7 @@ Authorization: Bearer <access_token>
     "firstName": "John",
     "lastName": "Doe",
     "phone": "+1234567890",
-    "avatar": "https://cdn.storybloom.com/avatars/usr_123.jpg",
+    "avatar": "https://cdn.pandatales.com/avatars/usr_123.jpg",
     "emailVerified": true,
     "phoneVerified": false,
     "createdAt": "2026-01-15T10:30:00Z",
@@ -123,7 +123,7 @@ Form Data:
   "success": true,
   "message": "Avatar uploaded successfully",
   "data": {
-    "avatarUrl": "https://cdn.storybloom.com/avatars/usr_123_1645678900.jpg"
+    "avatarUrl": "https://cdn.pandatales.com/avatars/usr_123_1645678900.jpg"
   }
 }
 ```
@@ -156,7 +156,7 @@ Authorization: Bearer <access_token>
         "age": 5,
         "gender": "female",
         "birthDate": "2021-03-15",
-        "photo": "https://cdn.storybloom.com/children/child_abc123.jpg",
+        "photo": "https://cdn.pandatales.com/children/child_abc123.jpg",
         "createdAt": "2026-01-20T10:30:00Z"
       },
       {
@@ -165,7 +165,7 @@ Authorization: Bearer <access_token>
         "age": 7,
         "gender": "male",
         "birthDate": "2019-08-22",
-        "photo": "https://cdn.storybloom.com/children/child_def456.jpg",
+        "photo": "https://cdn.pandatales.com/children/child_def456.jpg",
         "createdAt": "2026-01-25T14:20:00Z"
       }
     ],
@@ -209,7 +209,7 @@ Form Data:
     "age": 5,
     "gender": "female",
     "birthDate": "2021-03-15",
-    "photo": "https://cdn.storybloom.com/children/child_abc123.jpg",
+    "photo": "https://cdn.pandatales.com/children/child_abc123.jpg",
     "createdAt": "2026-02-14T10:30:00Z"
   }
 }
@@ -245,7 +245,7 @@ Authorization: Bearer <access_token>
     "age": 5,
     "gender": "female",
     "birthDate": "2021-03-15",
-    "photo": "https://cdn.storybloom.com/children/child_abc123.jpg",
+    "photo": "https://cdn.pandatales.com/children/child_abc123.jpg",
     "booksCreated": 3,
     "createdAt": "2026-01-20T10:30:00Z",
     "updatedAt": "2026-02-10T15:20:00Z"
@@ -295,7 +295,7 @@ Form Data (all optional):
     "age": 6,
     "gender": "female",
     "birthDate": "2021-03-15",
-    "photo": "https://cdn.storybloom.com/children/child_abc123_new.jpg",
+    "photo": "https://cdn.pandatales.com/children/child_abc123_new.jpg",
     "updatedAt": "2026-02-14T10:30:00Z"
   }
 }

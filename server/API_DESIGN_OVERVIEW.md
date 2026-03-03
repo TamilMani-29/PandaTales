@@ -1,4 +1,4 @@
-# Story Bloom - Backend API Design Overview
+# Panda Tales - Backend API Design Overview
 
 **Version:** 1.0  
 **Last Updated:** February 14, 2026  
@@ -20,7 +20,7 @@
 
 ## 🏗 Architecture Overview
 
-Story Bloom backend follows a modular microservices-ready architecture:
+Panda Tales backend follows a modular microservices-ready architecture:
 
 ```
 ┌─────────────┐
@@ -69,16 +69,23 @@ Story Bloom backend follows a modular microservices-ready architecture:
 
 **Base Path:** `/api/v1/users`
 
-### 3. [Book Templates](./api-docs/03-book-templates-api.md)
+### 3. [Story Book Templates](./api-docs/03a-story-book-templates-api.md)
 - Story book templates listing
+- Search and filtering by genre, age group, reading level
+- Template details and series information
+- Template categories and genres
+
+**Base Path:** `/api/v1/story-books`
+
+### 4. [Coloring Book Templates](./api-docs/03b-coloring-book-templates-api.md)
 - Coloring book templates listing
-- Search and filtering
+- Search and filtering by theme, art style
 - Template details
-- Template categories
+- Theme filtering
 
-**Base Path:** `/api/v1/templates`
+**Base Path:** `/api/v1/coloring-books`
 
-### 4. [Book Generation](./api-docs/04-book-generation-api.md)
+### 5. [Book Generation](./api-docs/04-book-generation-api.md)
 - Personalized book creation
 - AI-powered story generation
 - Image processing and integration
@@ -87,7 +94,7 @@ Story Bloom backend follows a modular microservices-ready architecture:
 
 **Base Path:** `/api/v1/books/generate`
 
-### 5. [Preview & Download](./api-docs/05-preview-download-api.md)
+### 6. [Preview & Download](./api-docs/05-preview-download-api.md)
 - Book preview access
 - Full book download (after purchase)
 - Preview page management
@@ -96,7 +103,7 @@ Story Bloom backend follows a modular microservices-ready architecture:
 
 **Base Path:** `/api/v1/books`
 
-### 6. [Orders & Checkout](./api-docs/06-orders-checkout-api.md)
+### 7. [Orders & Checkout](./api-docs/06-orders-checkout-api.md)
 - Cart management
 - Order creation
 - Order status tracking
@@ -105,7 +112,7 @@ Story Bloom backend follows a modular microservices-ready architecture:
 
 **Base Path:** `/api/v1/orders`
 
-### 7. [Payment Processing](./api-docs/07-payment-api.md)
+### 8. [Payment Processing](./api-docs/07-payment-api.md)
 - Payment intent creation
 - Payment processing (Stripe integration)
 - Payment status webhooks
@@ -368,6 +375,6 @@ X-RateLimit-Reset: 1645789200
 
 ## 👥 Contact & Support
 
-**API Team:** api-team@storybloom.com  
-**Documentation:** https://docs.storybloom.com/api  
-**Support:** support@storybloom.com
+**API Team:** api-team@pandatales.com  
+**Documentation:** https://docs.pandatales.com/api  
+**Support:** support@pandatales.com

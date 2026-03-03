@@ -1,4 +1,4 @@
-# Database migration script for StoryBloom (PowerShell)
+# Database migration script for PandaTales (PowerShell)
 
 param(
     [Parameter(Position=0)]
@@ -9,7 +9,7 @@ param(
 )
 
 Write-Host "================================" -ForegroundColor Cyan
-Write-Host "StoryBloom Database Migration" -ForegroundColor Cyan
+Write-Host "PandaTales Database Migration" -ForegroundColor Cyan
 Write-Host "================================" -ForegroundColor Cyan
 Write-Host ""
 

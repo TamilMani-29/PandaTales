@@ -1,6 +1,6 @@
-# StoryBloom Backend API
+# PandaTales Backend API
 
-AI-Powered Children's Storybook Generation Platform - Backend API built with FastAPI.
+AI-Powered Children's Coloring Book Generation Platform - Backend API built with FastAPI.
 
 ## Tech Stack
 
@@ -283,7 +283,7 @@ docker-compose ps postgres
 docker-compose logs postgres
 
 # Connect to PostgreSQL
-docker-compose exec postgres psql -U storybloom -d storybloom
+docker-compose exec postgres psql -U pandatales -d pandatales
 ```
 
 ### MinIO Issues
@@ -392,21 +392,21 @@ pytest tests/test_auth.py -v
 ```ini
 # .env
 # Application
-APP_NAME=StoryBloom
+APP_NAME=PandaTales
 APP_VERSION=1.0.0
 DEBUG=False
 SECRET_KEY=your-secret-key-min-32-chars
-ALLOWED_ORIGINS=http://localhost:3000,https://storybloom.com
+ALLOWED_ORIGINS=http://localhost:3000,https://pandatales.com
 
 # Database
-DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/storybloom
+DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/pandatales
 
 # AWS
 AWS_ACCESS_KEY_ID=xxx
 AWS_SECRET_ACCESS_KEY=xxx
 AWS_REGION=us-east-1
-S3_BUCKET_NAME=storybloom-books
-CLOUDFRONT_DOMAIN=cdn.storybloom.com
+S3_BUCKET_NAME=pandatales-books
+CLOUDFRONT_DOMAIN=cdn.pandatales.com
 
 # OpenAI
 OPENAI_API_KEY=sk-xxx
@@ -424,13 +424,13 @@ GOOGLE_CLIENT_SECRET=xxx
 # Email (SMTP)
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
-SMTP_USER=noreply@storybloom.com
+SMTP_USER=noreply@pandatales.com
 SMTP_PASSWORD=xxx
-SMTP_FROM=Story Bloom <noreply@storybloom.com>
+SMTP_FROM=Panda Tales <noreply@pandatales.com>
 
 # Celery (Optional - requires message broker)
 # CELERY_BROKER_URL=amqp://guest:guest@localhost:5672//
-# CELERY_RESULT_BACKEND=db+postgresql://user:pass@localhost:5432/storybloom
+# CELERY_RESULT_BACKEND=db+postgresql://user:pass@localhost:5432/pandatales
 
 # Security
 JWT_SECRET_KEY=your-jwt-secret-key
@@ -496,7 +496,7 @@ For questions about the API design:
 
 ## 📄 License
 
-Story Bloom API Documentation - All Rights Reserved
+Panda Tales API Documentation - All Rights Reserved
 
 ---
 
