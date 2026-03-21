@@ -20,6 +20,10 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: 'Pandora Pages - Crafted For You',
   description: 'Create magical personalized coloring books for your child, crafted just for them',
+  icons: {
+    icon: '/logo_without_name.jpeg',
+    apple: '/logo_without_name.jpeg',
+  },
 };
 
 export default function RootLayout({

@@ -92,7 +92,8 @@ async def initiate_book_generation(
     child_name: str | None = Form(None, description="Child name (required if no child_id)"),
     child_age: int | None = Form(None, description="Child age (required if no child_id)"),
     child_gender: str | None = Form(None, description="Child gender (required if no child_id)"),
-    parent_email: str | None = Form(None, description="Parent email for notifications"),
+    parent_email: str = Form(..., description="Parent email required for delivery and notifications"),
+    whatsapp_number: str | None = Form(None, description="WhatsApp number for order updates (required for printed copies)"),
     photos: list[UploadFile] = File(..., description="1-3 photos, max 10MB each"),
     db: AsyncSession = Depends(get_db),
     user_id: UUID = Depends(get_current_user_id),
@@ -119,6 +120,7 @@ async def initiate_book_generation(
         child_age=child_age,
         child_gender=child_gender,  # type: ignore
         parent_email=parent_email,
+        whatsapp_number=whatsapp_number,
     )
     
     service = GeneratedBookService(db)
@@ -142,7 +144,8 @@ async def generate_photo_to_coloring_book(
     child_name: str | None = Form(None, description="Child name (required if no child_id)"),
     child_age: int | None = Form(None, description="Child age (required if no child_id)"),
     child_gender: str | None = Form(None, description="Child gender (required if no child_id)"),
-    parent_email: str | None = Form(None, description="Parent email for notifications"),
+    parent_email: str = Form(..., description="Parent email required for delivery and notifications"),
+    whatsapp_number: str | None = Form(None, description="WhatsApp number for order updates (required for printed copies)"),
     line_weight: str = Form("medium", description="Line weight: thin, medium, thick"),
     detail_level: str = Form("medium", description="Detail level: low, medium, high"),
     simplification_level: str = Form("moderate", description="Simplification: minimal, moderate, high"),
@@ -170,6 +173,7 @@ async def generate_photo_to_coloring_book(
         child_age=child_age,
         child_gender=child_gender,  # type: ignore
         parent_email=parent_email,
+        whatsapp_number=whatsapp_number,
         line_weight=line_weight,  # type: ignore
         detail_level=detail_level,  # type: ignore
         simplification_level=simplification_level,  # type: ignore
@@ -201,7 +205,8 @@ async def generate_theme_based_coloring_book(
     child_name: str | None = Form(None, description="Child name (required if no child_id)"),
     child_age: int | None = Form(None, description="Child age (required if no child_id)"),
     child_gender: str | None = Form(None, description="Child gender (required if no child_id)"),
-    parent_email: str | None = Form(None, description="Parent email for notifications"),
+    parent_email: str = Form(..., description="Parent email required for delivery and notifications"),
+    whatsapp_number: str | None = Form(None, description="WhatsApp number for order updates (required for printed copies)"),
     photos: list[UploadFile] = File(..., description="Reference photos (min/max based on theme)"),
     db: AsyncSession = Depends(get_db),
     user_id: UUID = Depends(get_current_user_id),
@@ -226,6 +231,7 @@ async def generate_theme_based_coloring_book(
         child_age=child_age,
         child_gender=child_gender,  # type: ignore
         parent_email=parent_email,
+        whatsapp_number=whatsapp_number,
     )
     
     service = GeneratedBookService(db)

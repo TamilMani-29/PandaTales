@@ -28,7 +28,8 @@ class BookGenerationCreate(BaseModel):
     child_name: str | None = Field(None, min_length=1, max_length=100)
     child_age: int | None = Field(None, gt=0, le=18)
     child_gender: Literal["male", "female", "other"] | None = None
-    parent_email: str | None = Field(None, pattern=r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
+    parent_email: str = Field(..., pattern=r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", description="Parent email required for delivery and notifications")
+    whatsapp_number: str | None = Field(None, max_length=20, description="WhatsApp number for order updates (required for printed copies)")
     # photos will be handled separately as file uploads
 
     @field_validator("child_name", mode="after")
@@ -64,7 +65,8 @@ class PhotoToColoringGenerationCreate(BaseModel):
     child_name: str | None = Field(None, min_length=1, max_length=100)
     child_age: int | None = Field(None, gt=0, le=18)
     child_gender: Literal["male", "female", "other"] | None = None
-    parent_email: str | None = Field(None, pattern=r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
+    parent_email: str = Field(..., pattern=r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", description="Parent email required for delivery and notifications")
+    whatsapp_number: str | None = Field(None, max_length=20, description="WhatsApp number for order updates (required for printed copies)")
     
     # Processing options
     line_weight: Literal["thin", "medium", "thick"] = "medium"
@@ -100,7 +102,8 @@ class ThemeBasedGenerationCreate(BaseModel):
     child_name: str | None = Field(None, min_length=1, max_length=100)
     child_age: int | None = Field(None, gt=0, le=18)
     child_gender: Literal["male", "female", "other"] | None = None
-    parent_email: str | None = Field(None, pattern=r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
+    parent_email: str = Field(..., pattern=r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", description="Parent email required for delivery and notifications")
+    whatsapp_number: str | None = Field(None, max_length=20, description="WhatsApp number for order updates (required for printed copies)")
     
     # Theme selection
     theme_config_id: UUID  # Reference to admin-configured theme

@@ -9,14 +9,14 @@ from app.api.v1.endpoints import (
     coloring_books,
     generated_books,
     generation_configs,
-    # story_books,  # Commented out - not included in this release
+    story_books,
     users,
 )
 
 api_router = APIRouter(prefix="/v1")
 
 # Include routers
-# api_router.include_router(story_books.router)  # Commented out - not included in this release
+api_router.include_router(story_books.router)
 api_router.include_router(coloring_books.router)
 api_router.include_router(generated_books.router)
 api_router.include_router(checkout.router)

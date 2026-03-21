@@ -4,6 +4,7 @@ import { ENDPOINTS } from '@/lib/api/endpoints';
 export interface CheckoutRequest {
   bookId: string;
   format: 'digital' | 'softcover' | 'hardcover';
+  whatsappNumber?: string;
 }
 
 export interface RazorpayOrderResponse {
@@ -31,6 +32,7 @@ export interface OrderRecord {
   status: 'created' | 'paid' | 'failed';
   paid_at: string | null;
   created_at: string;
+  whatsapp_number: string | null;
 }
 
 export const checkoutService = {
@@ -38,6 +40,7 @@ export const checkoutService = {
     const { data } = await apiClient.post(ENDPOINTS.checkout.createOrder, {
       book_id: request.bookId,
       format: request.format,
+      whatsapp_number: request.whatsappNumber ?? null,
     });
     return data.data as RazorpayOrderResponse;
   },

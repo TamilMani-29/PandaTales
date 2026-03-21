@@ -1,5 +1,10 @@
 import apiClient from '@/lib/api/axios';
 import { ENDPOINTS } from '@/lib/api/endpoints';
+import { mockGenerateColoringBook } from '@/lib/mock-api/mock-generation.service';
+
+// TODO: Set to false (and remove the mock guard blocks below) when the backend
+//       AI generation pipeline is ready for end-to-end use.
+const USE_MOCK_GENERATION = true;
 import {
   ColoringBookTemplate,
   ColoringBookTemplateListItem,
@@ -207,6 +212,9 @@ export const coloringTemplatesService = {
   async generateThemeBased(
     request: ThemeBasedSubmitData
   ): Promise<BookGenerationResult> {
+    // TODO: Remove this mock block when backend generation is ready.
+    if (USE_MOCK_GENERATION) return mockGenerateColoringBook();
+
     const formData = new FormData();
     formData.append('theme_config_id', request.themeConfigId);
     formData.append('num_pages', String(request.numPages));
@@ -214,7 +222,10 @@ export const coloringTemplatesService = {
     if (request.childName) formData.append('child_name', request.childName);
     if (request.childAge !== undefined)
       formData.append('child_age', String(request.childAge));
-    if (request.parentEmail) formData.append('parent_email', request.parentEmail);
+    formData.append('parent_email', request.parentEmail);
+    if (request.whatsappNumber) {
+      formData.append('whatsapp_number', request.whatsappNumber);
+    }
     request.photos.forEach((photo) => formData.append('photos', photo));
 
     const { data } = await apiClient.post<ApiSuccessResponse<ApiGenerationResult>>(
@@ -232,11 +243,17 @@ export const coloringTemplatesService = {
   async generatePhotoColoring(
     request: PhotoColoringSubmitData
   ): Promise<BookGenerationResult> {
+    // TODO: Remove this mock block when backend generation is ready.
+    if (USE_MOCK_GENERATION) return mockGenerateColoringBook();
+
     const formData = new FormData();
     if (request.childName) formData.append('child_name', request.childName);
     if (request.childAge !== undefined)
       formData.append('child_age', String(request.childAge));
-    if (request.parentEmail) formData.append('parent_email', request.parentEmail);
+    formData.append('parent_email', request.parentEmail);
+    if (request.whatsappNumber) {
+      formData.append('whatsapp_number', request.whatsappNumber);
+    }
     request.photos.forEach((photo) => formData.append('photos', photo));
 
     const { data } = await apiClient.post<ApiSuccessResponse<ApiGenerationResult>>(

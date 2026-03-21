@@ -132,8 +132,9 @@ class GeneratedBook(Base, BaseModel):
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     error_details: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    # Notification
-    parent_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Notification / delivery contact
+    parent_email: Mapped[str] = mapped_column(String(255), nullable=False)
+    whatsapp_number: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="generated_books")

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
-import { Upload, X, ImagePlus, Sparkles, Loader } from 'lucide-react';
+import { Upload, X, ImagePlus, Sparkles, Loader, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -19,6 +19,7 @@ const schema = z.object({
   childName: z.string().min(1, 'Child name is required').max(50),
   age: z.number({ invalid_type_error: 'Age is required' }).min(1).max(12),
   parentEmail: z.string().email('Invalid email address'),
+  whatsappNumber: z.string().regex(/^[0-9+\s\-]{7,20}$/, 'Enter a valid WhatsApp number').optional().or(z.literal('')),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -70,6 +71,7 @@ export function PhotoUploadMode({ onSubmit, isPending }: Props) {
       childName: data.childName,
       childAge: data.age,
       parentEmail: data.parentEmail,
+      whatsappNumber: data.whatsappNumber || undefined,
       photos,
     });
   };
@@ -120,6 +122,23 @@ export function PhotoUploadMode({ onSubmit, isPending }: Props) {
               <p className="text-sm text-destructive mt-1">{errors.parentEmail.message}</p>
             )}
           </div>
+
+          <div>
+            <Label htmlFor="whatsappNumber">
+              WhatsApp Number
+              <span className="text-muted-foreground font-normal text-xs ml-1">(required for printed copies)</span>
+            </Label>
+            <Input
+              id="whatsappNumber"
+              type="tel"
+              {...register('whatsappNumber')}
+              placeholder="+91 98765 43210"
+              className="rounded-xl mt-1"
+            />
+            {errors.whatsappNumber && (
+              <p className="text-sm text-destructive mt-1">{errors.whatsappNumber.message}</p>
+            )}
+          </div>
         </div>
 
         <div className="space-y-4">
@@ -134,7 +153,7 @@ export function PhotoUploadMode({ onSubmit, isPending }: Props) {
               We'll convert each photo into a unique coloring page for your child
             </p>
 
-            {photos.length < MAX_PHOTOS && (
+            {photos.length === 0 && (
               <label
                 htmlFor="photo-input"
                 className="flex flex-col items-center justify-center border-2 border-dashed border-purple-200 rounded-2xl p-6 cursor-pointer hover:border-primary hover:bg-purple-50/50 transition-colors"
@@ -157,23 +176,32 @@ export function PhotoUploadMode({ onSubmit, isPending }: Props) {
           </div>
 
           {previews.length > 0 && (
-            <div className="grid grid-cols-3 gap-2">
+            <div className="flex flex-wrap gap-3">
               {previews.map((src, i) => (
-                <div key={i} className="relative aspect-square rounded-xl overflow-hidden group">
+                <div key={i} className="relative w-20 h-20 rounded-xl overflow-hidden group border-2 border-purple-100">
                   <Image src={src} alt={`Photo ${i + 1}`} fill className="object-cover" />
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors" />
                   <button
                     type="button"
                     onClick={() => removePhoto(i)}
-                    className="absolute top-1 right-1 bg-white/90 text-destructive rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                    className="absolute top-1 right-1 bg-white/90 text-destructive rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
                   >
                     <X className="h-3 w-3" />
                   </button>
-                  <span className="absolute bottom-1 left-1 bg-black/50 text-white text-[10px] rounded px-1">
-                    Page {i + 1}
+                  <span className="absolute bottom-1 left-1 bg-black/50 text-white text-[9px] font-bold rounded-full px-1.5 py-0.5">
+                    {i + 1}
                   </span>
                 </div>
               ))}
+              {photos.length < MAX_PHOTOS && (
+                <label
+                  htmlFor="photo-input"
+                  className="w-20 h-20 rounded-xl border-2 border-dashed border-purple-200 flex flex-col items-center justify-center cursor-pointer hover:border-[#6B21A8] hover:bg-purple-50 transition-all"
+                >
+                  <ImagePlus className="h-5 w-5 text-[#6B21A8]" />
+                  <span className="text-xs text-[#6B21A8] mt-1">Add</span>
+                </label>
+              )}
             </div>
           )}
         </div>

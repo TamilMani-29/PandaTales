@@ -16,7 +16,7 @@ services:
   # PostgreSQL Database
   postgres:
     profiles: ["postgres", "all"]
-    image: postgres:15-alpine
+    image: postgres:15
     container_name: pandatales_postgres
     environment:
       POSTGRES_USER: pandatales

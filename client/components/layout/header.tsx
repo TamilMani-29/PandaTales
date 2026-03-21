@@ -17,7 +17,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 const navLinks = [
   { href: '/coloring-books', label: 'Coloring Books' },
-  { href: '/pricing', label: 'Pricing' },
+  { href: '/story-books', label: 'Story Books' },
   { href: '/about', label: 'About' },
 ];
 

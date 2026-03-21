@@ -121,6 +121,7 @@ class GeneratedBookService:
             estimated_completion_time=120,  # 2 minutes estimate
             photos=photos,
             parent_email=data.parent_email,
+            whatsapp_number=data.whatsapp_number,
             generation_steps={
                 "photo_processing": "pending",
                 "line_extraction": "pending",
@@ -199,6 +200,7 @@ class GeneratedBookService:
             total_pages=data.num_pages,
             photos=photos,
             parent_email=data.parent_email,
+            whatsapp_number=data.whatsapp_number,
             generation_steps={
                 "photo_processing": "pending",
                 "theme_extraction": "pending",
@@ -283,6 +285,7 @@ class GeneratedBookService:
             estimated_completion_time=180,  # 3 minutes estimate
             photos=photos,
             parent_email=data.parent_email,
+            whatsapp_number=data.whatsapp_number,
             generation_steps={
                 "photo_processing": "pending",
                 "story_generation": "pending",

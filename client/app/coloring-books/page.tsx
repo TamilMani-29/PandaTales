@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Camera, Palette, Sparkles, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { Footer } from '@/components/layout/footer';
 
 const creationModes = [
   {
@@ -140,11 +141,7 @@ export default function ColoringBooksPage() {
         </section>
       </main>
 
-      <footer className="relative z-10 border-t mt-8 py-8 bg-white/60 backdrop-blur">
-        <div className="container mx-auto px-4 text-center text-muted-foreground">
-          <p>&copy; 2026 Pandora Pages. Crafted for you, one page at a time.</p>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

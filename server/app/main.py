@@ -52,7 +52,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 # Create FastAPI application
 app = FastAPI(
     title=settings.APP_NAME,
-    description="PandaTales - AI-Powered Children's Coloring Book Generation Platform",
+    description="Pandora Pages - AI-Powered Children's Personalised Book Generation Platform",
     version="1.0.0",
     docs_url="/docs" if settings.APP_ENV != "production" else None,
     redoc_url="/redoc" if settings.APP_ENV != "production" else None,

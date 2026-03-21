@@ -13,6 +13,7 @@ class CreateOrderRequest(BaseModel):
 
     book_id: UUID
     format: str = Field(..., pattern="^(digital|softcover|hardcover)$")
+    whatsapp_number: str | None = Field(None, max_length=20, description="WhatsApp number for print order updates")
 
 
 class VerifyPaymentRequest(BaseModel):
@@ -49,5 +50,6 @@ class OrderResponse(BaseModel):
     status: str
     paid_at: datetime | None
     created_at: datetime
+    whatsapp_number: str | None = None
 
     model_config = {"from_attributes": True}

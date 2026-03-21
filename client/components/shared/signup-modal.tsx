@@ -122,7 +122,7 @@ export function SignupModal({ open, onOpenChange, onSwitchToLogin }: SignupModal
   const onSubmit = async (data: FormData) => {
     try {
       await registerUser(data.name, data.email, data.password);
-      toast.success(`Welcome to PandaTales, ${data.name}! 🐼✨`);
+      toast.success(`Welcome to Pandora Pages, ${data.name}! 🐼✨`);
       reset();
       onOpenChange(false);
       router.push('/dashboard');
@@ -156,7 +156,7 @@ export function SignupModal({ open, onOpenChange, onSwitchToLogin }: SignupModal
                 Create your account
               </DialogTitle>
               <DialogDescription className="text-white/75 text-sm mt-0.5">
-                Join PandaTales and start creating magical books 🐼
+                Join Pandora Pages and start creating magical books 🐼
               </DialogDescription>
             </div>
           </div>

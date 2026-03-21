@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PhotoUploadMode } from '@/features/coloring/components/photo-upload-mode';
 import { ThemeBasedMode } from '@/features/coloring/components/theme-based-mode';
+import { Footer } from '@/components/layout/footer';
 import {
   ColoringBookMode,
   ThemeBasedSubmitData,
@@ -233,11 +234,7 @@ function CreateColoringBookContent() {
         </motion.div>
       </main>
 
-      <footer className="relative z-10 border-t mt-20 py-8 bg-white/60 backdrop-blur">
-        <div className="container mx-auto px-4 text-center text-muted-foreground">
-          <p>&copy; 2026 Pandora Pages. Crafted for you, one page at a time.</p>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

@@ -3,13 +3,15 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Sparkles, Palette, Heart, Star } from 'lucide-react';
+import { Sparkles, Palette, Heart, Star, BookOpen } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { Footer } from '@/components/layout/footer';
 
 export default function HomePage() {
   return (
     <div className="min-h-screen relative">
       <main className="relative z-10">
+        {/* ── Hero ────────────────────────────────────────────────────────── */}
         <section className="container mx-auto px-4 py-20 text-center">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -24,20 +26,74 @@ export default function HomePage() {
               <br />
               Becomes the Hero
             </h1>
-            <p className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Create magical personalized coloring books featuring your child as the star of their own adventure
+            <p className="text-xl md:text-2xl text-muted-foreground mb-10 max-w-2xl mx-auto">
+              Create magical personalised books featuring your child as the star of their own adventure — choose to colour or to read
             </p>
             <div className="flex gap-4 justify-center flex-wrap">
               <Link href="/coloring-books">
                 <Button size="lg" className="text-lg px-8 py-6 rounded-2xl shadow-lg hover:shadow-xl transition-all bg-[#6B21A8] hover:bg-[#581C87]">
                   <Palette className="mr-2 h-5 w-5" />
-                  Browse Coloring Books
+                  Coloring Books
+                </Button>
+              </Link>
+              <Link href="/story-books">
+                <Button size="lg" variant="outline" className="text-lg px-8 py-6 rounded-2xl shadow-lg hover:shadow-xl transition-all border-2 border-[#C9A227] text-[#C9A227] hover:bg-amber-50">
+                  <BookOpen className="mr-2 h-5 w-5" />
+                  Story Books
                 </Button>
               </Link>
             </div>
           </motion.div>
         </section>
 
+        {/* ── Book type cards ──────────────────────────────────────────────── */}
+        <section className="container mx-auto px-4 pb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            viewport={{ once: true }}
+            className="grid md:grid-cols-2 gap-8"
+          >
+            {/* Coloring Books */}
+            <Card className="border-2 border-purple-200 shadow-lg hover:shadow-xl transition-all rounded-3xl overflow-hidden group">
+              <CardContent className="p-8">
+                <div className="w-14 h-14 rounded-2xl bg-purple-100 flex items-center justify-center mb-5">
+                  <Palette className="h-7 w-7 text-[#6B21A8]" />
+                </div>
+                <h3 className="text-2xl font-bold mb-2">Coloring Books</h3>
+                <p className="text-muted-foreground mb-5">
+                  Hand-drawn illustrations starring your child. Print and colour at home or order a premium bound copy — hours of creative fun.
+                </p>
+                <Link href="/coloring-books">
+                  <Button variant="outline" className="rounded-xl border-[#6B21A8] text-[#6B21A8] hover:bg-purple-50">
+                    Browse Coloring Books
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+
+            {/* Story Books */}
+            <Card className="border-2 border-amber-200 shadow-lg hover:shadow-xl transition-all rounded-3xl overflow-hidden group">
+              <CardContent className="p-8">
+                <div className="w-14 h-14 rounded-2xl bg-amber-50 flex items-center justify-center mb-5">
+                  <BookOpen className="h-7 w-7 text-[#C9A227]" />
+                </div>
+                <h3 className="text-2xl font-bold mb-2">Story Books</h3>
+                <p className="text-muted-foreground mb-5">
+                  Fully illustrated personalised stories where your child leads the adventure. Choose a genre, add their name, and the magic begins.
+                </p>
+                <Link href="/story-books">
+                  <Button variant="outline" className="rounded-xl border-[#C9A227] text-[#C9A227] hover:bg-amber-50">
+                    Browse Story Books
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </section>
+
+        {/* ── Feature pillars ─────────────────────────────────────────────── */}
         <section className="container mx-auto px-4 py-16">
           <motion.div
             initial={{ opacity: 0 }}
@@ -51,7 +107,7 @@ export default function HomePage() {
                 <div className="w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center mx-auto mb-4">
                   <Heart className="h-8 w-8 text-[#6B21A8]" />
                 </div>
-                <h3 className="text-2xl font-bold mb-3">Personalized</h3>
+                <h3 className="text-2xl font-bold mb-3">Personalised</h3>
                 <p className="text-muted-foreground">
                   Your child becomes the hero in beautifully illustrated stories tailored just for them
                 </p>
@@ -84,6 +140,7 @@ export default function HomePage() {
           </motion.div>
         </section>
 
+        {/* ── CTA banner ──────────────────────────────────────────────────── */}
         <section className="container mx-auto px-4 py-16 text-center">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -94,22 +151,27 @@ export default function HomePage() {
           >
             <h2 className="text-4xl font-bold mb-4 text-[#6B21A8]">Ready to Create Magic?</h2>
             <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-              Start creating personalized books that your child will treasure forever
+              Start creating personalised books that your child will treasure forever
             </p>
-            <Link href="/coloring-books">
-              <Button size="lg" className="text-lg px-8 py-6 rounded-2xl bg-[#6B21A8] hover:bg-[#581C87]">
-                Get Started Now
-              </Button>
-            </Link>
+            <div className="flex gap-4 justify-center flex-wrap">
+              <Link href="/coloring-books">
+                <Button size="lg" className="text-lg px-8 py-6 rounded-2xl bg-[#6B21A8] hover:bg-[#581C87]">
+                  <Palette className="mr-2 h-5 w-5" />
+                  Coloring Books
+                </Button>
+              </Link>
+              <Link href="/story-books">
+                <Button size="lg" variant="outline" className="text-lg px-8 py-6 rounded-2xl border-2 border-[#C9A227] text-[#C9A227] hover:bg-amber-50">
+                  <BookOpen className="mr-2 h-5 w-5" />
+                  Story Books
+                </Button>
+              </Link>
+            </div>
           </motion.div>
         </section>
       </main>
 
-      <footer className="relative z-10 border-t mt-20 py-8 bg-white/60 backdrop-blur">
-        <div className="container mx-auto px-4 text-center text-muted-foreground">
-          <p>&copy; 2026 Pandora Pages. Crafted for you, one page at a time.</p>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

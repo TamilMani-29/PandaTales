@@ -6,6 +6,7 @@ export const useStoryBooks = () => {
   return useQuery({
     queryKey: ['storyBooks'],
     queryFn: booksService.getAllStoryBooks,
+    staleTime: 5 * 60 * 1000,
   });
 };
 
@@ -13,6 +14,7 @@ export const useColoringBooks = () => {
   return useQuery({
     queryKey: ['coloringBooks'],
     queryFn: booksService.getAllColoringBooks,
+    staleTime: 5 * 60 * 1000,
   });
 };
 
@@ -21,6 +23,7 @@ export const useStoryBook = (id: string) => {
     queryKey: ['storyBook', id],
     queryFn: () => booksService.getStoryBookById(id),
     enabled: !!id,
+    staleTime: 10 * 60 * 1000,
   });
 };
 
@@ -29,19 +32,33 @@ export const useColoringBook = (id: string) => {
     queryKey: ['coloringBook', id],
     queryFn: () => booksService.getColoringBookById(id),
     enabled: !!id,
+    staleTime: 10 * 60 * 1000,
   });
 };
 
+/** Mutation that returns { id: string (generation_id), status: string } */
 export const useGenerateBook = () => {
   return useMutation({
     mutationFn: (request: GenerateBookRequest) => booksService.generateBook(request),
   });
 };
 
+/**
+ * Preview data for a generated book.
+ * Polls every 3 s until status = 'completed' or 'failed'.
+ */
 export const useBookPreview = (bookId: string) => {
   return useQuery({
     queryKey: ['bookPreview', bookId],
     queryFn: () => booksService.getBookPreview(bookId),
     enabled: !!bookId,
+    staleTime: 0,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      if (status === 'completed' || status === 'failed' || status === 'cancelled') {
+        return false;
+      }
+      return 3000;
+    },
   });
 };

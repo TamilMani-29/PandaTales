@@ -181,7 +181,7 @@ async def delete_story_book_template(
 async def list_story_book_genres(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """Get all genres"""
+    """Get all unique genres from active story book templates"""
 
     service = StoryBookTemplateService(db)
     genres = await service.get_all_genres()
@@ -197,21 +197,21 @@ async def list_story_book_genres(
     response_model=dict[str, Any],
     status_code=status.HTTP_200_OK,
     summary="Get series templates",
-    description="Get all story book templates in a series",
+    description="Get all story book templates that belong to a series",
 )
-async def get_series_story_book_templates(
+async def get_series_templates(
     series_id: UUID,
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """Get all story book templates in a series"""
+    """Get all books in a series"""
 
     service = StoryBookTemplateService(db)
     series_info = await service.get_series_info(series_id)
 
     if not series_info:
         return success_response(
-            data={"books": []},
-            message="No templates found in this series",
+            data={"series": None, "books": []},
+            message="Series not found",
         )
 
     return success_response(

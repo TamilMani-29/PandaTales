@@ -153,7 +153,7 @@ export default function LoginPage() {
 
               <div className="border-t mt-6 pt-5 text-center">
                 <p className="text-sm text-muted-foreground">
-                  New to PandaTales?{' '}
+                  New to Pandora Pages?{' '}
                   <Link
                     href="/signup"
                     className="font-semibold text-[#6B21A8] hover:underline underline-offset-2 transition-colors"

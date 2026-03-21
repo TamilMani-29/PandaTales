@@ -88,6 +88,7 @@ class PaymentService:
             currency="INR",
             razorpay_order_id=rz_order["id"],
             status="created",
+            whatsapp_number=data.whatsapp_number,
         )
         order = await self.order_repo.create(order)
         await self.db.commit()

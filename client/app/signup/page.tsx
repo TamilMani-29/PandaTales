@@ -104,7 +104,7 @@ export default function SignupPage() {
   const onSubmit = async (data: FormData) => {
     try {
       await registerUser(data.name, data.email, data.password);
-      toast.success(`Welcome to PandaTales, ${data.name}! 🐼✨`);
+      toast.success(`Welcome to Pandora Pages, ${data.name}! 🐼✨`);
       router.push('/dashboard');
     } catch {
       toast.error('Registration failed. Please try again.');
@@ -127,7 +127,7 @@ export default function SignupPage() {
           <div className="text-center mb-8">
             <Sparkles className="h-16 w-16 mx-auto mb-4 text-primary sparkle" />
             <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-[#6B21A8] to-[#C9A227] bg-clip-text text-transparent">
-              Join PandaTales
+              Join Pandora Pages
             </h1>
             <p className="text-muted-foreground">
               Create your account and start building magical books 🐼

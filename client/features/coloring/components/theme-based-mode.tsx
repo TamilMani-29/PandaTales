@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
-import { ImagePlus, X, Sparkles, Loader, Check, BookOpen, User, CircleAlert as AlertCircle, Star, Camera, Mail, Hash } from 'lucide-react';
+import { ImagePlus, X, Sparkles, Loader, Check, BookOpen, User, CircleAlert as AlertCircle, Star, Camera, Mail, Hash, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -38,6 +38,7 @@ const schema = z.object({
   childName: z.string().min(1, 'Child name is required').max(50),
   age: z.number({ invalid_type_error: 'Age is required' }).min(1).max(12),
   parentEmail: z.string().email('Invalid email address'),
+  whatsappNumber: z.string().regex(/^[0-9+\s\-]{7,20}$/, 'Enter a valid WhatsApp number').optional().or(z.literal('')),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -147,6 +148,7 @@ export function ThemeBasedMode({ onSubmit, isPending }: Props) {
       childName: data.childName,
       childAge: data.age,
       parentEmail: data.parentEmail,
+      whatsappNumber: data.whatsappNumber || undefined,
       photos,
     });
   };
@@ -290,15 +292,15 @@ export function ThemeBasedMode({ onSubmit, isPending }: Props) {
 
             {/* Photo previews */}
             {previews.length > 0 && (
-              <div className={`grid grid-cols-5 gap-3 ${photos.length < MAX_PHOTOS ? 'mt-4' : ''}`}>
+              <div className={`flex flex-wrap gap-3 ${photos.length < MAX_PHOTOS ? 'mt-4' : ''}`}>
                 {previews.map((src, i) => (
-                  <div key={i} className="relative aspect-square rounded-xl overflow-hidden group ring-2 ring-amber-100">
+                  <div key={i} className="relative w-20 h-20 rounded-xl overflow-hidden group ring-2 ring-amber-100">
                     <Image src={src} alt={`Photo ${i + 1}`} fill className="object-cover" />
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors rounded-xl" />
                     <button
                       type="button"
                       onClick={() => removePhoto(i)}
-                      className="absolute top-1 right-1 bg-white text-destructive rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                      className="absolute top-1 right-1 bg-white text-destructive rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
                     >
                       <X className="h-3 w-3" />
                     </button>
@@ -311,9 +313,10 @@ export function ThemeBasedMode({ onSubmit, isPending }: Props) {
                 {photos.length < MAX_PHOTOS && (
                   <label
                     htmlFor="theme-photo-input"
-                    className="relative aspect-square rounded-xl border-2 border-dashed border-amber-200 flex items-center justify-center cursor-pointer hover:border-amber-400 hover:bg-amber-50 transition-all"
+                    className="w-20 h-20 rounded-xl border-2 border-dashed border-amber-200 flex flex-col items-center justify-center cursor-pointer hover:border-amber-400 hover:bg-amber-50 transition-all"
                   >
-                    <ImagePlus className="h-6 w-6 text-amber-400" />
+                    <ImagePlus className="h-5 w-5 text-amber-400" />
+                    <span className="text-xs text-amber-500 mt-1">Add</span>
                   </label>
                 )}
               </div>
@@ -408,6 +411,27 @@ export function ThemeBasedMode({ onSubmit, isPending }: Props) {
               {errors.parentEmail && (
                 <p className="text-xs text-destructive mt-1 flex items-center gap-1">
                   <AlertCircle className="h-3 w-3" /> {errors.parentEmail.message}
+                </p>
+              )}
+            </div>
+
+            {/* WhatsApp */}
+            <div>
+              <Label htmlFor="whatsappNumber-theme" className="flex items-center gap-1.5 text-sm font-semibold mb-1.5">
+                <Phone className="h-3.5 w-3.5 text-pink-500" />
+                WhatsApp Number
+                <span className="text-muted-foreground font-normal text-xs ml-0.5">(for printed copies)</span>
+              </Label>
+              <Input
+                id="whatsappNumber-theme"
+                type="tel"
+                {...register('whatsappNumber')}
+                placeholder="+91 98765 43210"
+                className="rounded-xl border-pink-100 focus:border-pink-300 focus-visible:ring-pink-200"
+              />
+              {errors.whatsappNumber && (
+                <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                  <AlertCircle className="h-3 w-3" /> {errors.whatsappNumber.message}
                 </p>
               )}
             </div>

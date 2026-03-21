@@ -1,13 +1,20 @@
-import { StoryBook, ColoringBookTemplateListItem, GenerateBookRequest, GeneratedBook } from '@/types/book.types';
-import booksData from '@/lib/mock-api/books.json';
+import { StoryBook, ColoringBookTemplateListItem, GenerateBookRequest, BookPreviewData } from '@/types/book.types';
 import { coloringTemplatesService } from '@/features/coloring/services/coloring-templates.service';
-
-const delay = (ms: number = 500) => new Promise(resolve => setTimeout(resolve, ms));
+import {
+  storyBookTemplatesService,
+  mapToStoryBook,
+  mapTemplateToStoryBook,
+} from './story-book-templates.service';
+import {
+  isMockPreviewId,
+  mockGetStoryBook,
+  mockGetColoringBook,
+} from '@/lib/mock-api/mock-generation.service';
 
 export const booksService = {
   async getAllStoryBooks(): Promise<StoryBook[]> {
-    await delay();
-    return booksData as StoryBook[];
+    const result = await storyBookTemplatesService.getTemplates({ limit: 100 });
+    return result.data.map(mapToStoryBook);
   },
 
   async getAllColoringBooks(): Promise<ColoringBookTemplateListItem[]> {
@@ -16,12 +23,19 @@ export const booksService = {
   },
 
   async getStoryBookById(id: string): Promise<StoryBook | null> {
-    await delay();
-    const book = booksData.find(b => b.id === id);
-    return book ? (book as StoryBook) : null;
+    // TODO: Remove mock guard when backend generation is ready.
+    if (isMockPreviewId(id)) return mockGetStoryBook(id);
+    try {
+      const template = await storyBookTemplatesService.getTemplateById(id);
+      return mapTemplateToStoryBook(template);
+    } catch {
+      return null;
+    }
   },
 
   async getColoringBookById(id: string): Promise<ColoringBookTemplateListItem | null> {
+    // TODO: Remove mock guard when backend generation is ready.
+    if (isMockPreviewId(id)) return mockGetColoringBook(id);
     try {
       return await coloringTemplatesService.getTemplateById(id);
     } catch {
@@ -29,36 +43,13 @@ export const booksService = {
     }
   },
 
-  async generateBook(request: GenerateBookRequest): Promise<GeneratedBook> {
-    await delay(2000);
-
-    const template = booksData.find(b => b.id === request.templateId);
-    if (!template) {
-      throw new Error('Template not found');
-    }
-
-    return {
-      ...template,
-      childName: request.childName,
-      previewPages: [
-        'https://images.pexels.com/photos/1148998/pexels-photo-1148998.jpeg?auto=compress&cs=tinysrgb&w=800',
-        'https://images.pexels.com/photos/256417/pexels-photo-256417.jpeg?auto=compress&cs=tinysrgb&w=800'
-      ],
-      fullPages: Array(template.totalPages).fill('').map((_, i) =>
-        `https://images.pexels.com/photos/${1148998 + i}/page-${i + 1}.jpeg`
-      ),
-      isPurchased: false,
-    } as GeneratedBook;
+  /** Initiate story book generation. Returns { id (generation_id), status }. */
+  async generateBook(request: GenerateBookRequest): Promise<{ id: string; status: string }> {
+    return storyBookTemplatesService.generateStoryBook(request);
   },
 
-  async getBookPreview(bookId: string): Promise<{ previewPages: string[]; totalPages: number }> {
-    await delay();
-    return {
-      previewPages: [
-        'https://images.pexels.com/photos/1148998/pexels-photo-1148998.jpeg?auto=compress&cs=tinysrgb&w=800',
-        'https://images.pexels.com/photos/256417/pexels-photo-256417.jpeg?auto=compress&cs=tinysrgb&w=800'
-      ],
-      totalPages: 24
-    };
+  /** Get preview data (polls via useBooks hook refetchInterval). */
+  async getBookPreview(bookId: string): Promise<BookPreviewData> {
+    return storyBookTemplatesService.getGeneratedBookPreview(bookId);
   },
 };

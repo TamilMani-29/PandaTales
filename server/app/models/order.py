@@ -68,6 +68,9 @@ class Order(Base, BaseModel):
         DateTime(timezone=True), nullable=True
     )
 
+    # Delivery contact
+    whatsapp_number: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="orders")
     book: Mapped["GeneratedBook"] = relationship("GeneratedBook", back_populates="orders")
