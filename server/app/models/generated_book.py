@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from app.models.child_profile import ChildProfile
     from app.models.generation_config import GenerationConfig
     from app.models.user import User
+    from app.models.order import Order
 
 
 class GeneratedBook(Base, BaseModel):
@@ -141,6 +142,12 @@ class GeneratedBook(Base, BaseModel):
     )
     theme_config: Mapped["GenerationConfig | None"] = relationship(
         "GenerationConfig"
+    )
+    orders: Mapped[list["Order"]] = relationship(
+        "Order",
+        back_populates="book",
+        cascade="all, delete-orphan",
+        lazy="select",
     )
 
     # Constraints

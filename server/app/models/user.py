@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from app.models.child_profile import ChildProfile
     from app.models.address import Address
     from app.models.generated_book import GeneratedBook
+    from app.models.order import Order
 
 
 class User(Base, BaseModel, SoftDeleteMixin):
@@ -88,6 +89,13 @@ class User(Base, BaseModel, SoftDeleteMixin):
         back_populates="user",
         cascade="all, delete-orphan",
         lazy="selectin",
+    )
+
+    orders: Mapped[list["Order"]] = relationship(
+        "Order",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="select",
     )
 
     # Table constraints

@@ -34,13 +34,10 @@ logger = get_logger(__name__)
 router = APIRouter(tags=["Book Generation"])
 
 
-# Helper function to get current user (placeholder - implement based on your auth)
-async def get_current_user_id() -> UUID:
-    """Get current authenticated user ID"""
-    # TODO: Implement actual authentication
-    # This is a placeholder - replace with your actual auth implementation
-    from uuid import uuid4
-    return uuid4()
+# TODO: Replace with real JWT auth dependency
+def get_current_user_id() -> UUID:
+    """Temporary function to get current user ID - replace with actual auth"""
+    return UUID("00000000-0000-0000-0000-000000000001")
 
 
 # Helper function to handle photo uploads with MinIO storage
@@ -68,7 +65,12 @@ async def process_photo_uploads(
                 message=f"Photo {idx + 1} error: {e.message}"
             )
         except ServiceUnavailableException as e:
-            logger.error(f"Failed to upload photo {idx + 1}: {e.message}")
+            logger.error(f"Failed to upload photo {idx + 1}: {e.message}", exc_info=True)
+            raise ServiceUnavailableException(
+                message=f"Failed to upload photo {idx + 1}. Please try again."
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error uploading photo {idx + 1}: {e}", exc_info=True)
             raise ServiceUnavailableException(
                 message=f"Failed to upload photo {idx + 1}. Please try again."
             )
@@ -143,7 +145,7 @@ async def generate_photo_to_coloring_book(
     parent_email: str | None = Form(None, description="Parent email for notifications"),
     line_weight: str = Form("medium", description="Line weight: thin, medium, thick"),
     detail_level: str = Form("medium", description="Detail level: low, medium, high"),
-    simplification_level: str = Form("medium", description="Simplification: low, medium, high"),
+    simplification_level: str = Form("moderate", description="Simplification: minimal, moderate, high"),
     photos: list[UploadFile] = File(..., description="1-10 photos, max 10MB each"),
     db: AsyncSession = Depends(get_db),
     user_id: UUID = Depends(get_current_user_id),

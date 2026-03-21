@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 270 40% 98%;
+    --foreground: 270 50% 15%;
+    --card: 0 0% 100%;
+    --card-foreground: 270 50% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 270 50% 15%;
+    --primary: 271 76% 43%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 43 95% 55%;
+    --secondary-foreground: 270 50% 15%;
+    --muted: 270 30% 94%;
+    --muted-foreground: 270 25% 45%;
+    --accent: 270 60% 92%;
+    --accent-foreground: 271 76% 43%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 270 20% 88%;
+    --input: 270 20% 88%;
+    --ring: 271 76% 43%;
+    --radius: 1rem;
+
+    --gold: 43 95% 55%;
+    --lavender: 270 60% 85%;
+    --deep-purple: 271 76% 43%;
+    --soft-lavender: 270 40% 93%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-gradient-to-br from-[#F5F3FF] via-[#FAF5FF] to-[#FFF8E6] text-foreground font-[family-name:var(--font-quicksand)];
+    min-height: 100vh;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-[family-name:var(--font-quicksand)] font-bold;
+  }
+}
+
+@layer utilities {
+  .cloud-animation {
+    animation: float 20s ease-in-out infinite;
+  }
+
+  .sparkle {
+    animation: sparkle 2s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0px) translateX(0px);
+    }
+    25% {
+      transform: translateY(-20px) translateX(10px);
+    }
+    50% {
+      transform: translateY(-10px) translateX(-10px);
+    }
+    75% {
+      transform: translateY(-15px) translateX(5px);
+    }
+  }
+
+  @keyframes sparkle {
+    0%, 100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.5;
+      transform: scale(1.1);
+    }
+  }
+}

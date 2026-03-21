@@ -1,12 +1,14 @@
 """Storage Service for MinIO/S3 operations with comprehensive error handling"""
 
+import asyncio
 import io
 from datetime import timedelta
 from pathlib import Path
 from typing import BinaryIO, Literal
 from uuid import UUID, uuid4
 
-from fastapi import UploadFile
+from fastapi import UploadFile as FastAPIUploadFile
+from starlette.datastructures import UploadFile
 from minio import Minio
 from minio.error import S3Error
 
@@ -34,19 +36,6 @@ class StorageService:
                 secure=settings.MINIO_SECURE,
             )
             self.bucket = settings.MINIO_BUCKET
-            
-            # Verify bucket exists
-            if not self.client.bucket_exists(self.bucket):
-                logger.error("minio_bucket_missing", bucket=self.bucket)
-                raise ServiceUnavailableException(
-                    message="Storage service is not properly configured"
-                )
-                
-        except S3Error as e:
-            logger.error("minio_connection_error", error_code=e.code, error_message=str(e), exc_info=True)
-            raise ServiceUnavailableException(
-                message="Failed to connect to storage service"
-            )
         except Exception as e:
             logger.error("storage_init_error", error=str(e), exc_info=True)
             raise ServiceUnavailableException(
@@ -77,24 +66,24 @@ class StorageService:
             ServiceUnavailableException: Upload failed
         """
         try:
-            # Handle UploadFile
+            # Read file content — UploadFile.read() is a coroutine in FastAPI
             if isinstance(file, UploadFile):
                 if content_type is None:
                     content_type = file.content_type or "application/octet-stream"
-                
-                # Read file content
                 file_content = await file.read()
-                file_size = len(file_content)
-                
-                # Reset file pointer for potential re-reads
                 await file.seek(0)
-                
-            # Handle BinaryIO
             else:
-                file_content = file.read()
-                file_size = len(file_content)
+                # BinaryIO — synchronous read
+                raw = file.read()
+                # Guard: if somehow we got a coroutine (shouldn't happen), await it
+                if asyncio.iscoroutine(raw):
+                    file_content = await raw
+                else:
+                    file_content = raw
                 if content_type is None:
                     content_type = "application/octet-stream"
+
+            file_size = len(file_content)
             
             # Validate file size
             if max_size_mb is not None:
@@ -107,15 +96,16 @@ class StorageService:
             if file_size == 0:
                 raise BadRequestException(message="File is empty")
             
-            # Upload to MinIO
+            # Upload to MinIO — run blocking SDK call off the event loop
             logger.info("uploading_file_to_minio", object_name=object_name, size_bytes=file_size, content_type=content_type)
             
-            self.client.put_object(
-                bucket_name=self.bucket,
-                object_name=object_name,
-                data=io.BytesIO(file_content),
-                length=file_size,
-                content_type=content_type,
+            await asyncio.to_thread(
+                self.client.put_object,
+                self.bucket,
+                object_name,
+                io.BytesIO(file_content),
+                file_size,
+                content_type or "application/octet-stream",
             )
             
             logger.info("file_uploaded_successfully", object_name=object_name, size_bytes=file_size)
@@ -224,6 +214,8 @@ class StorageService:
             
         except BadRequestException:
             raise
+        except ServiceUnavailableException:
+            raise
         except Exception as e:
             logger.error("image_upload_error", error=str(e), exc_info=True)
             raise ServiceUnavailableException(
@@ -252,7 +244,7 @@ class StorageService:
         try:
             # Check if object exists
             try:
-                self.client.stat_object(self.bucket, object_name)
+                await asyncio.to_thread(self.client.stat_object, self.bucket, object_name)
             except S3Error as e:
                 if e.code == "NoSuchKey":
                     raise NotFoundException(
@@ -260,11 +252,12 @@ class StorageService:
                     )
                 raise
             
-            # Generate presigned URL
-            url = self.client.presigned_get_object(
-                bucket_name=self.bucket,
-                object_name=object_name,
-                expires=expires,
+            # Generate presigned URL — run blocking SDK call off the event loop
+            url = await asyncio.to_thread(
+                self.client.presigned_get_object,
+                self.bucket,
+                object_name,
+                expires,
             )
             
             logger.info("generated_presigned_url", object_name=object_name, expires_seconds=int(expires.total_seconds()))
@@ -305,7 +298,7 @@ class StorageService:
             ServiceUnavailableException: Deletion failed
         """
         try:
-            self.client.remove_object(self.bucket, object_name)
+            await asyncio.to_thread(self.client.remove_object, self.bucket, object_name)
             logger.info("file_deleted", object_name=object_name)
             return True
             
@@ -342,7 +335,7 @@ class StorageService:
             bool: True if file exists
         """
         try:
-            self.client.stat_object(self.bucket, object_name)
+            await asyncio.to_thread(self.client.stat_object, self.bucket, object_name)
             return True
         except S3Error as e:
             if e.code == "NoSuchKey":

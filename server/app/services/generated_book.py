@@ -63,9 +63,9 @@ class GeneratedBookService:
                 raise NotFoundException("Child profile not found")
             return child.name, child.age, child.gender, child_id
         else:
-            if not child_name or not child_age or not child_gender:
+            if not child_name or not child_age:
                 raise ValueError("Child information is required")
-            return child_name, child_age, child_gender, None
+            return child_name, child_age, child_gender or "other", None
 
     async def _check_generation_limit(self, user_id: UUID, max_per_day: int = 10) -> None:
         """Check if user has exceeded daily generation limit"""

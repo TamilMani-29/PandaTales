@@ -70,8 +70,6 @@ class PhotoToColoringGenerationCreate(BaseModel):
     line_weight: Literal["thin", "medium", "thick"] = "medium"
     detail_level: Literal["low", "medium", "high"] = "medium"
     simplification_level: Literal["minimal", "moderate", "high"] = "moderate"
-    
-    # photos (1-10) will be handled separately as file uploads
 
     @field_validator("child_name", mode="after")
     @classmethod
@@ -90,8 +88,7 @@ class PhotoToColoringGenerationCreate(BaseModel):
     @field_validator("child_gender", mode="after")
     @classmethod
     def validate_child_gender(cls, v: str | None, info) -> str | None:
-        if not info.data.get("child_id") and not v:
-            raise ValueError("child_gender is required when child_id is not provided")
+        # child_gender is optional — not all frontends collect it
         return v
 
 
@@ -133,8 +130,7 @@ class ThemeBasedGenerationCreate(BaseModel):
     @field_validator("child_gender", mode="after")
     @classmethod
     def validate_child_gender(cls, v: str | None, info) -> str | None:
-        if not info.data.get("child_id") and not v:
-            raise ValueError("child_gender is required when child_id is not provided")
+        # child_gender is optional — not all frontends collect it
         return v
 
 
