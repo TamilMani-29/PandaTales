@@ -92,8 +92,8 @@ export default function AboutPage() {
             <p className="text-muted-foreground leading-relaxed">
               We&rsquo;d love to hear from you — whether you have a question about an order, feedback on a book, or
               just want to share how much your child loved their story. Reach us at{' '}
-              <a href="mailto:hello@pandorapages.in" className="text-[#6B21A8] hover:underline font-medium">
-                hello@pandorapages.in
+              <a href="mailto:info.pandorapages@gmail.com" className="text-[#6B21A8] hover:underline font-medium">
+                info.pandorapages@gmail.com
               </a>
               .
             </p>

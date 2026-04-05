@@ -42,6 +42,7 @@ export default function CreateBookPage() {
   const { mutate: generateBook, isPending } = useGenerateBook();
 
   const [photoFiles, setPhotoFiles] = useState<File[]>([]);
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [activeSlide, setActiveSlide] = useState(0);
 
@@ -75,13 +76,18 @@ export default function CreateBookPage() {
     const files = Array.from(e.target.files || []);
     const remaining = 3 - photoFiles.length;
     if (remaining <= 0) return;
-    setPhotoFiles((prev) => [...prev, ...files.slice(0, remaining)]);
+    const newFiles = files.slice(0, remaining);
+    const newPreviews = newFiles.map((f) => URL.createObjectURL(f));
+    setPhotoFiles((prev) => [...prev, ...newFiles]);
+    setPhotoPreviews((prev) => [...prev, ...newPreviews]);
     setPhotoError(null);
     e.target.value = '';
   };
 
   const removePhoto = (index: number) => {
+    URL.revokeObjectURL(photoPreviews[index]);
     setPhotoFiles((prev) => prev.filter((_, i) => i !== index));
+    setPhotoPreviews((prev) => prev.filter((_, i) => i !== index));
   };
 
   const onSubmit = (data: CreateBookFormData) => {
@@ -338,7 +344,7 @@ export default function CreateBookPage() {
                             className="relative w-20 h-20 rounded-xl overflow-hidden border-2 border-border group"
                           >
                             <Image
-                              src={URL.createObjectURL(file)}
+                              src={photoPreviews[idx]}
                               alt={`Photo ${idx + 1}`}
                               fill
                               className="object-cover"

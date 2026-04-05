@@ -92,6 +92,9 @@ class StoryBookTemplate(Base, BaseModel, SoftDeleteMixin):
         server_default=text("'[]'::jsonb"),
     )
 
+    # AI generation prompts config — stores story_lines, scenes, backgrounds, negative_prompt etc.
+    prompts_config: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+
     # Customization
     customization_options: Mapped[dict] = mapped_column(
         JSONB,

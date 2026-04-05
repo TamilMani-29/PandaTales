@@ -18,6 +18,7 @@ export const ENDPOINTS = {
     generatePhotoToColoring: '/v1/books/generate/photo-to-coloring',
     generateThemeBased: '/v1/books/generate/theme-based',
     generationStatus: (id: string) => `/v1/books/generate/${id}/status`,
+    downloadPdf: (id: string) => `/v1/books/${id}/download-pdf`,
   },
   generatedBooks: {
     getById: (id: string) => `/v1/books/${id}`,

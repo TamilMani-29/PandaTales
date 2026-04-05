@@ -10,19 +10,20 @@ const SECTIONS = [
       { label: 'Story Books', href: '/story-books' },
     ],
   },
-  {
-    heading: 'Account',
-    links: [
-      { label: 'Sign Up', href: '/signup' },
-      { label: 'Log In', href: '/login' },
-      { label: 'Dashboard', href: '/dashboard' },
-    ],
-  },
+  // AUTH: Account section — re-enable when authentication is introduced
+  // {
+  //   heading: 'Account',
+  //   links: [
+  //     { label: 'Sign Up', href: '/signup' },
+  //     { label: 'Log In', href: '/login' },
+  //     { label: 'Dashboard', href: '/dashboard' },
+  //   ],
+  // },
   {
     heading: 'Company',
     links: [
       { label: 'About Us', href: '/about' },
-      { label: 'Contact', href: 'mailto:hello@pandorapages.in' },
+      { label: 'Contact', href: 'mailto:info.pandorapages@gmail.com' },
       { label: 'Privacy Policy', href: '/privacy' },
       { label: 'Terms of Service', href: '/terms' },
     ],
@@ -33,12 +34,12 @@ export function Footer() {
   return (
     <footer className="relative z-10 border-t mt-20 bg-white/80 backdrop-blur">
       {/* Main grid */}
-      <div className="container mx-auto px-4 py-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
+      <div className="container mx-auto px-4 py-12 grid grid-cols-1 sm:grid-cols-3 gap-10">
         {/* Brand column */}
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 sm:col-span-1">
           <Link href="/" className="flex items-center gap-2 w-fit">
             <Image
-              src="/logo_without_name.jpeg"
+              src="/logo_without_name.png"
               alt="Pandora Pages logo"
               width={44}
               height={44}
@@ -69,11 +70,11 @@ export function Footer() {
             </Link>
           </div>
           <Link
-            href="mailto:hello@pandorapages.in"
+            href="mailto:info.pandorapages@gmail.com"
             className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-[#6B21A8] transition-colors w-fit"
           >
             <Mail className="h-4 w-4" />
-            hello@pandorapages.in
+            info.pandorapages@gmail.com
           </Link>
         </div>
 

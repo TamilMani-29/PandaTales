@@ -1,5 +1,7 @@
 """Generated Book / Book Generation API Routes"""
 
+import asyncio
+import io
 from typing import Any
 from uuid import UUID
 
@@ -12,10 +14,11 @@ from fastapi import (
     UploadFile,
     status,
 )
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common import PaginationParams, get_logger, paginated_response, success_response
-from app.common.exceptions import BadRequestException, ServiceUnavailableException
+from app.common.exceptions import BadRequestException, ForbiddenException, NotFoundException, ServiceUnavailableException
 from app.db.session import get_db
 from app.schemas.generated_book import (
     BookGenerationCreate,
@@ -398,4 +401,129 @@ async def regenerate_book(
         data=result.model_dump(),
         message="Book regeneration started",
         status_code=status.HTTP_202_ACCEPTED,
+    )
+
+
+@router.get(
+    "/books/{book_id}/download-pdf",
+    summary="Download book as PDF",
+    description="Generate and stream a PDF of all book pages in order. Book must be completed.",
+)
+async def download_book_pdf(
+    book_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user_id: UUID = Depends(get_current_user_id),
+) -> StreamingResponse:
+    """
+    Build a PDF from all generated page images and stream it to the client.
+
+    Pages are ordered by their page_number. Each Replicate-generated PNG
+    is fetched from MinIO and composed into a multi-page PDF using Pillow.
+    """
+    from datetime import timedelta
+    from PIL import Image
+
+    from app.repositories.generated_book import GeneratedBookRepository
+    from app.services.generated_book import GeneratedBookService
+    from app.services.replicate_generation import ReplicateGenerationService
+    import httpx
+
+    # Use service to trigger polling (ensures images are downloaded)
+    service = GeneratedBookService(db)
+    book_details = await service.get_book_details(book_id, user_id)
+    
+    # Now fetch the raw book model with updated data
+    repo = GeneratedBookRepository(db)
+    book = await repo.get_by_id(book_id, user_id)
+
+    if not book:
+        raise NotFoundException("Book not found")
+
+    if book.status != "completed":
+        raise BadRequestException("Book is not ready for download yet")
+
+    prediction_map: dict = book.replicate_prediction_ids or {}
+    
+    logger.info(
+        "download_pdf_request",
+        book_id=str(book_id),
+        status=book.status,
+        prediction_map_keys=list(prediction_map.keys()) if prediction_map else [],
+        has_prediction_map=bool(prediction_map),
+    )
+    
+    if not prediction_map:
+        raise BadRequestException("No generated images found for this book")
+
+    # Sort pages by page_number
+    sorted_pages = sorted(
+        prediction_map.items(),
+        key=lambda x: x[1].get("page_number", 0),
+    )
+
+    storage = StorageService()
+
+    # Collect all page images in order
+    pil_images: list[Image.Image] = []
+    async with httpx.AsyncClient(timeout=60) as client:
+        for _key, info in sorted_pages:
+            image_object = info.get("image_object")
+            logger.info(
+                "processing_pdf_page",
+                book_id=str(book_id),
+                key=_key,
+                has_image_object=bool(image_object),
+                info_keys=list(info.keys()),
+                status=info.get("status"),
+            )
+            if not image_object:
+                logger.warning(
+                    "pdf_page_missing_image_object",
+                    book_id=str(book_id),
+                    key=_key,
+                    info=info,
+                )
+                continue
+            try:
+                presigned_url = await storage.get_file_url(
+                    image_object, expires=timedelta(minutes=10)
+                )
+                resp = await client.get(presigned_url)
+                resp.raise_for_status()
+                img = Image.open(io.BytesIO(resp.content)).convert("RGB")
+                pil_images.append(img)
+                logger.info(
+                    "pdf_page_loaded",
+                    book_id=str(book_id),
+                    key=_key,
+                    image_size=img.size,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "pdf_page_fetch_failed",
+                    book_id=str(book_id),
+                    object_name=image_object,
+                    error=str(exc),
+                )
+
+    if not pil_images:
+        raise ServiceUnavailableException("Could not load any page images")
+
+    # Build PDF in memory
+    pdf_buffer = io.BytesIO()
+    pil_images[0].save(
+        pdf_buffer,
+        format="PDF",
+        save_all=True,
+        append_images=pil_images[1:],
+    )
+    pdf_buffer.seek(0)
+
+    safe_title = (book.child_name or "book").replace(" ", "_")
+    filename = f"{safe_title}_storybook.pdf"
+
+    return StreamingResponse(
+        content=pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

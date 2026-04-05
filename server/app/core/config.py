@@ -83,6 +83,14 @@ class Settings(BaseSettings):
     RAZORPAY_KEY_ID: str = ""
     RAZORPAY_KEY_SECRET: str = ""
 
+    # Replicate AI (image generation)
+    REPLICATE_API_TOKEN: str = ""
+    REPLICATE_MODEL_VERSION: str = "467d062309da518648ba89d226490e02b8ed09b5abc15026e54e31c5a8cd0769"
+    MAX_PARALLEL_GENERATIONS: int = 2  # max concurrent Replicate predictions per book
+    TEST_PAGE_LIMIT: int | None = 2  # Set to None to disable, or number to limit pages for testing
+    REPLICATE_STAGGER_SECONDS: float = 5.0  # Delay between prediction starts to avoid rate limiting
+    REPLICATE_MAX_RETRIES: int = 3  # Reduced from 6 to minimize log noise
+
     # Email
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_PORT: int = 587

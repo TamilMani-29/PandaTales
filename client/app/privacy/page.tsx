@@ -129,8 +129,8 @@ export default function PrivacyPage() {
             </ul>
             <p className="text-muted-foreground leading-relaxed mt-3">
               To exercise any of these rights, email us at{' '}
-              <a href="mailto:hello@pandorapages.in" className="text-[#6B21A8] underline">
-                hello@pandorapages.in
+              <a href="mailto:info.pandorapages@gmail.com" className="text-[#6B21A8] underline">
+                info.pandorapages@gmail.com
               </a>
               .
             </p>
@@ -164,8 +164,8 @@ export default function PrivacyPage() {
             <h2 className="text-xl font-bold mb-3">11. Contact Us</h2>
             <p className="text-muted-foreground leading-relaxed">
               If you have any questions about this Privacy Policy please contact us at{' '}
-              <a href="mailto:hello@pandorapages.in" className="text-[#6B21A8] underline">
-                hello@pandorapages.in
+              <a href="mailto:info.pandorapages@gmail.com" className="text-[#6B21A8] underline">
+                info.pandorapages@gmail.com
               </a>
               .
             </p>

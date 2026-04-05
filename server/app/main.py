@@ -119,11 +119,11 @@ async def not_found_exception_handler(request: Request, exc: NotFoundException):
     logger.warning(
         "not_found",
         path=request.url.path,
-        detail=exc.detail,
+        message=exc.message,
     )
     return JSONResponse(
         status_code=status.HTTP_404_NOT_FOUND,
-        content=error_response(exc.detail, status.HTTP_404_NOT_FOUND),
+        content=error_response(exc.message, status.HTTP_404_NOT_FOUND),
     )
 
 
@@ -133,11 +133,11 @@ async def bad_request_exception_handler(request: Request, exc: BadRequestExcepti
     logger.warning(
         "bad_request",
         path=request.url.path,
-        detail=exc.detail,
+        message=exc.message,
     )
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
-        content=error_response(exc.detail, status.HTTP_400_BAD_REQUEST),
+        content=error_response(exc.message, status.HTTP_400_BAD_REQUEST),
     )
 
 
@@ -147,11 +147,11 @@ async def unauthorized_exception_handler(request: Request, exc: UnauthorizedExce
     logger.warning(
         "unauthorized",
         path=request.url.path,
-        detail=exc.detail,
+        message=exc.message,
     )
     return JSONResponse(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        content=error_response(exc.detail, status.HTTP_401_UNAUTHORIZED),
+        content=error_response(exc.message, status.HTTP_401_UNAUTHORIZED),
     )
 
 
@@ -161,11 +161,11 @@ async def forbidden_exception_handler(request: Request, exc: ForbiddenException)
     logger.warning(
         "forbidden",
         path=request.url.path,
-        detail=exc.detail,
+        message=exc.message,
     )
     return JSONResponse(
         status_code=status.HTTP_403_FORBIDDEN,
-        content=error_response(exc.detail, status.HTTP_403_FORBIDDEN),
+        content=error_response(exc.message, status.HTTP_403_FORBIDDEN),
     )
 
 
@@ -175,11 +175,11 @@ async def conflict_exception_handler(request: Request, exc: ConflictException):
     logger.warning(
         "conflict",
         path=request.url.path,
-        detail=exc.detail,
+        message=exc.message,
     )
     return JSONResponse(
         status_code=status.HTTP_409_CONFLICT,
-        content=error_response(exc.detail, status.HTTP_409_CONFLICT),
+        content=error_response(exc.message, status.HTTP_409_CONFLICT),
     )
 
 
@@ -189,13 +189,13 @@ async def validation_exception_handler(request: Request, exc: ValidationExceptio
     logger.warning(
         "validation_error",
         path=request.url.path,
-        detail=exc.detail,
+        message=exc.message,
         errors=exc.errors,
     )
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content=error_response(
-            message=exc.detail,
+            message=exc.message,
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             errors=exc.errors,
         ),

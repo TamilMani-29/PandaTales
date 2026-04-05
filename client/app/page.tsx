@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Sparkles, Palette, Heart, Star, BookOpen } from 'lucide-react';
@@ -19,7 +20,19 @@ export default function HomePage() {
             transition={{ duration: 0.2 }}
           >
             <div className="flex justify-center mb-6">
-              <Sparkles className="h-16 w-16 text-primary sparkle" />
+              <motion.div
+                animate={{ y: [0, -10, 0] }}
+                transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+              >
+                <Image
+                  src="/logo_without_name.png"
+                  alt="Pandora Pages"
+                  width={96}
+                  height={96}
+                  className="object-contain drop-shadow-lg"
+                  priority
+                />
+              </motion.div>
             </div>
             <h1 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-[#6B21A8] via-[#9333EA] to-[#C9A227] bg-clip-text text-transparent">
               Where Every Child

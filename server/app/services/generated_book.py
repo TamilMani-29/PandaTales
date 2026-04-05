@@ -1,5 +1,6 @@
 """Generated Book Service"""
 
+import asyncio
 from datetime import datetime
 from typing import Sequence
 from uuid import UUID
@@ -37,8 +38,33 @@ from app.schemas.generated_book import (
     ThemeBasedGenerationCreate,
 )
 from app.services.mock_generation import start_mock_generation
+from app.services.replicate_generation import ReplicateGenerationService
 
 logger = get_logger(__name__)
+
+
+async def _run_replicate_generation(
+    book_id: UUID,
+    reference_photo_object: str,
+    prompts_config: dict,
+    child_name: str,
+    child_gender: str,
+) -> None:
+    """Background coroutine: start all Replicate predictions for a story book.
+
+    Opens its own DB session so it's not tied to the request session that
+    gets closed as soon as the HTTP response is sent.
+    """
+    from app.db.session import AsyncSessionLocal
+
+    async with AsyncSessionLocal() as db:
+        try:
+            svc = ReplicateGenerationService(db)
+            await svc.start_story_book_generation(book_id, reference_photo_object, prompts_config, child_name, child_gender)
+            await db.commit()
+            logger.info("replicate_generation_started", book_id=str(book_id))
+        except Exception as exc:
+            logger.error("replicate_generation_background_error", book_id=str(book_id), error=str(exc))
 
 
 class GeneratedBookService:
@@ -233,9 +259,9 @@ class GeneratedBookService:
         photos: list[str],  # List of uploaded photo URLs
     ) -> BookGenerationResponse:
         """Initiate book generation process"""
-        # Validate generation limit (e.g., max 10 per day)
+        # Validate generation limit (increased for testing)
         daily_count = await self.repository.get_user_generation_count_today(user_id)
-        if daily_count >= 10:
+        if daily_count >= 100:
             raise ForbiddenException("Daily generation limit exceeded")
 
         # Get template to validate
@@ -297,8 +323,18 @@ class GeneratedBookService:
         book = await self.repository.create(book)
         await self.db.commit()
 
-        # Start mock generation in background (replace with actual AI generation later)
-        await start_mock_generation(book.id, self.db)
+        # Dispatch generation: real Replicate for story books, mock for coloring books
+        if data.template_type == "story_book" and hasattr(template, "prompts_config") and template.prompts_config:
+            # Use the first uploaded photo as the reference image
+            reference_photo = photos[0]
+            asyncio.ensure_future(
+                _run_replicate_generation(
+                    book.id, reference_photo, template.prompts_config, child_name, data.child_gender
+                )
+            )
+        else:
+            # Coloring books still use mock generation until real pipeline is ready
+            await start_mock_generation(book.id, self.db)
 
         return BookGenerationResponse(
             generation_id=book.id,
@@ -334,6 +370,36 @@ class GeneratedBookService:
             )
 
         elif book.status == "processing":
+            # For story books with Replicate predictions, poll and update in real time
+            if book.template_type == "story_book" and book.replicate_prediction_ids:
+                replicate_svc = ReplicateGenerationService(self.db)
+                poll_result = await replicate_svc.poll_and_update(generation_id)
+                await self.db.commit()
+                # Re-fetch updated book after polling
+                book = await self.repository.get_by_id(generation_id, user_id)
+                if book and book.status == "completed":
+                    preview_url = f"/preview/{book.id}"
+                    return GenerationStatusCompleted(
+                        generation_id=book.id,
+                        status="completed",
+                        book_id=book.id,
+                        progress=100,
+                        completed_at=book.completed_at or book.updated_at,
+                        preview_url=preview_url,
+                    )
+                if book and book.status == "failed":
+                    error = GenerationErrorDetail(
+                        code=book.error_code or "GENERATION_ERROR",
+                        message=book.error_message or "Generation failed",
+                        details=book.error_details,
+                    )
+                    return GenerationStatusFailed(
+                        generation_id=book.id,
+                        status="failed",
+                        error=error,
+                        failed_at=book.failed_at or book.updated_at,
+                    )
+
             steps_data = book.generation_steps or {}
             steps = GenerationStepStatus(
                 photo_processing=steps_data.get("photo_processing", "pending"),
@@ -452,6 +518,21 @@ class GeneratedBookService:
         book = await self.repository.get_by_id(book_id, user_id)
         if not book:
             raise NotFoundException("Book not found")
+
+        # For story books with Replicate predictions, always poll to ensure images are downloaded
+        # Even if status is "completed", we need to retry failed image downloads
+        if (
+            book.template_type == "story_book"
+            and book.replicate_prediction_ids
+            and book.status in ("processing", "completed")  # Poll for both states
+        ):
+            replicate_svc = ReplicateGenerationService(self.db)
+            await replicate_svc.poll_and_update(book_id)
+            await self.db.commit()
+            # Re-fetch to get the updated status / preview_pages
+            book = await self.repository.get_by_id(book_id, user_id)
+            if not book:
+                raise NotFoundException("Book not found")
 
         # Get template info
         if book.template_type == "story_book":

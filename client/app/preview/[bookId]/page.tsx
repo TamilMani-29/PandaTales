@@ -19,6 +19,7 @@ import {
   Printer,
   ChevronLeft,
   ChevronRight,
+  Clock,
 } from 'lucide-react';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
@@ -117,24 +118,53 @@ export default function PreviewPage() {
   // ── Pending / processing state ────────────────────────────────────────────
 
   if (preview.status === 'queued' || preview.status === 'processing') {
+    const isRateLimited = preview.currentStep === 'rate_limited';
+
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-6 max-w-sm px-4">
           <div className="relative mx-auto w-20 h-20">
-            <BookOpen className="h-20 w-20 text-[#6B21A8]/20" />
-            <Loader2 className="h-8 w-8 animate-spin text-[#6B21A8] absolute inset-0 m-auto" />
+            {isRateLimited ? (
+              <>
+                <div className="w-20 h-20 rounded-full bg-amber-100 flex items-center justify-center">
+                  <Clock className="h-10 w-10 text-amber-500" />
+                </div>
+              </>
+            ) : (
+              <>
+                <BookOpen className="h-20 w-20 text-[#6B21A8]/20" />
+                <Loader2 className="h-8 w-8 animate-spin text-[#6B21A8] absolute inset-0 m-auto" />
+              </>
+            )}
           </div>
           <div>
-            <h2 className="text-xl font-bold mb-1">
-              {preview.status === 'queued' ? 'In Queue…' : 'Generating Your Book…'}
-            </h2>
-            <p className="text-muted-foreground text-sm">
-              We&apos;re personalising{' '}
-              <span className="font-semibold">&ldquo;{preview.templateTitle}&rdquo;</span> for{' '}
-              <span className="font-semibold">{preview.childName}</span>.
-              <br />
-              This usually takes 30–60 seconds.
-            </p>
+            {isRateLimited ? (
+              <>
+                <h2 className="text-xl font-bold mb-1 text-amber-700">
+                  AI Service Is Busy
+                </h2>
+                <p className="text-muted-foreground text-sm">
+                  The image generation service is temporarily at capacity.
+                  We&apos;re automatically retrying —{' '}
+                  <span className="font-semibold">no action needed on your end.</span>
+                  <br />
+                  This page will update automatically when ready.
+                </p>
+              </>
+            ) : (
+              <>
+                <h2 className="text-xl font-bold mb-1">
+                  {preview.status === 'queued' ? 'In Queue…' : 'Generating Your Book…'}
+                </h2>
+                <p className="text-muted-foreground text-sm">
+                  We&apos;re personalising{' '}
+                  <span className="font-semibold">&ldquo;{preview.templateTitle}&rdquo;</span> for{' '}
+                  <span className="font-semibold">{preview.childName}</span>.
+                  <br />
+                  This usually takes 30–60 seconds.
+                </p>
+              </>
+            )}
           </div>
           {preview.progress > 0 && (
             <div className="space-y-2">

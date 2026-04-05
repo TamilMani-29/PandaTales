@@ -4,27 +4,27 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useOrders } from '@/features/user/hooks/useUser';
-import { useAuth } from '@/lib/providers/auth-provider';
+// AUTH: import { useAuth } from '@/lib/providers/auth-provider';
 import { Loader as Loader2, Download, Package, CircleCheck as CheckCircle, Clock } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+// AUTH: import { useRouter } from 'next/navigation';
+// AUTH: import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 
 export default function DashboardPage() {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  // AUTH: const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { data: orders, isLoading: ordersLoading } = useOrders();
-  const router = useRouter();
+  // AUTH: const router = useRouter();
 
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push('/login');
-    }
-  }, [isAuthenticated, authLoading, router]);
+  // AUTH: useEffect(() => {
+  // AUTH:   if (!authLoading && !isAuthenticated) {
+  // AUTH:     router.push('/login');
+  // AUTH:   }
+  // AUTH: }, [isAuthenticated, authLoading, router]);
 
-  if (authLoading || ordersLoading) {
+  if (ordersLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

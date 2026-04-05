@@ -18,6 +18,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # Widen alembic_version.version_num to support longer revision IDs used in this project
+    op.execute("ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(128)")
+
     # Back-fill any existing NULL rows with a placeholder so the NOT NULL
     # constraint can be applied without violating existing data.
     op.execute(

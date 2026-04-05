@@ -24,6 +24,8 @@ export const useStoryBook = (id: string) => {
     queryFn: () => booksService.getStoryBookById(id),
     enabled: !!id,
     staleTime: 10 * 60 * 1000,
+    retry: false, // Don't retry on 404
+    throwOnError: false, // Fail silently for checkout page fallback pattern
   });
 };
 
@@ -33,6 +35,8 @@ export const useColoringBook = (id: string) => {
     queryFn: () => booksService.getColoringBookById(id),
     enabled: !!id,
     staleTime: 10 * 60 * 1000,
+    retry: false, // Don't retry on 404
+    throwOnError: false, // Fail silently for checkout page fallback pattern
   });
 };
 

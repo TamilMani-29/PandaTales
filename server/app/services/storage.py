@@ -284,6 +284,58 @@ class StorageService:
                 message="Failed to generate file URL"
             )
 
+    async def download_file(self, object_name: str) -> bytes:
+        """
+        Download file content from MinIO
+        
+        Args:
+            object_name: Path/name in bucket
+            
+        Returns:
+            bytes: File content
+            
+        Raises:
+            NotFoundException: File not found
+            ServiceUnavailableException: Download failed
+        """
+        try:
+            # Download file — run blocking SDK call off the event loop
+            response = await asyncio.to_thread(
+                self.client.get_object,
+                self.bucket,
+                object_name,
+            )
+            
+            # Read all data from response
+            data = response.read()
+            response.close()
+            response.release_conn()
+            
+            logger.info("file_downloaded", object_name=object_name, size_bytes=len(data))
+            return data
+            
+        except S3Error as e:
+            if e.code == "NoSuchKey":
+                raise NotFoundException(
+                    message=f"File not found: {object_name}"
+                )
+            logger.error(
+                "minio_download_error",
+                object_name=object_name,
+                error_code=e.code,
+                error_message=e.message,
+                exc_info=True,
+            )
+            raise ServiceUnavailableException(
+                message="Failed to download file"
+            )
+            
+        except Exception as e:
+            logger.error("unexpected_download_error", object_name=object_name, error=str(e), exc_info=True)
+            raise ServiceUnavailableException(
+                message="File download failed"
+            )
+
     async def delete_file(self, object_name: str) -> bool:
         """
         Delete file from MinIO

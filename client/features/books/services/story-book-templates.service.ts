@@ -8,7 +8,7 @@ import {
 
 // TODO: Set to false (and remove the mock guard blocks below) when the backend
 //       AI generation pipeline is ready for end-to-end use.
-const USE_MOCK_GENERATION = true;
+const USE_MOCK_GENERATION = false;
 import {
   StoryBook,
   StoryBookTemplate,
@@ -323,5 +323,23 @@ export const storyBookTemplatesService = {
       coverImageUrl: book.cover_image_url,
       isPurchased: book.is_purchased,
     };
+  },
+
+  /**
+   * GET /api/v1/books/{id}/download-pdf
+   * Build the PDF on the backend and trigger a browser file download.
+   */
+  async downloadBookPdf(bookId: string, childName: string): Promise<void> {
+    const response = await apiClient.get(ENDPOINTS.books.downloadPdf(bookId), {
+      responseType: 'blob',
+    });
+    const url = URL.createObjectURL(response.data as Blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${childName.replace(/\s+/g, '_')}_storybook.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   },
 };

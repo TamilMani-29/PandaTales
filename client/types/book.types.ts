@@ -229,9 +229,9 @@ export interface BookPreviewData {
 
 export interface BookFilters {
   search?: string;
-  ageGroup?: AgeGroup;
-  genre?: Genre;
-  type?: BookType;
+  ageGroup?: AgeGroup[];
+  genre?: Genre[];
+  type?: BookType[];
   minPrice?: number;
   maxPrice?: number;
 }

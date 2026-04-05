@@ -57,6 +57,7 @@ STORY_TPL_3 = UUID("00000000-0000-0000-0003-000000000003")  # Space Explorer Jou
 STORY_TPL_4 = UUID("00000000-0000-0000-0003-000000000004")  # Ocean Kingdom Chronicles (series 1)
 STORY_TPL_5 = UUID("00000000-0000-0000-0003-000000000005")  # Ocean Kingdom: The Deep Dive (series 2)
 STORY_TPL_6 = UUID("00000000-0000-0000-0003-000000000006")  # Goodnight Little Panda
+STORY_TPL_7 = UUID("00000000-0000-0000-0003-000000000007")  # Magical Unicorn Forest Adventure (Replicate)
 
 # Coloring book templates
 COLOR_TPL_1 = UUID("00000000-0000-0000-0004-000000000001")  # Magical Animals Coloring
@@ -418,6 +419,371 @@ async def seed_story_templates(session: AsyncSession) -> None:
             customization_options={"child_name": True, "dedication": True},
             tags=["bedtime", "panda", "baby", "rhyme", "sleep", "toddler"],
             is_published=True,
+        ),
+        # ----------------------------------------------------------------
+        # Replicate AI-powered story template – Magical Unicorn Forest
+        # ----------------------------------------------------------------
+        dict(
+            id=STORY_TPL_7,
+            title="Magical Unicorn Forest Adventure",
+            description="Your child enters a magical forest and befriends a unicorn in this 10-page AI-illustrated adventure, personalised with their photo.",
+            long_description=(
+                "A fully personalised 10-page storybook where your child's actual face appears in every illustration, "
+                "generated with AI. They journey through an enchanted forest, cross a glowing river, and form an "
+                "unforgettable friendship with a magical unicorn. Each page is crafted as a vibrant pastel-cartoon illustration."
+            ),
+            book_type="single",
+            genre="fantasy",
+            age_group="3-5",
+            story_theme="friendship and courage",
+            moral_lesson="True courage comes from the friendships we make along the way.",
+            reading_level="beginner",
+            price=14.99,
+            cover_image_url=cover(77),
+            preview_images=[preview(771), preview(772)],
+            total_pages=10,
+            features=[
+                "Personalised with your child's photo",
+                "AI-generated full-colour illustrations",
+                "Vibrant pastel cartoon art style",
+                "Magical unicorn companion",
+            ],
+            learning_outcomes=[
+                "Encourages bravery and kindness",
+                "Sparks imagination and creativity",
+                "Personalised reading engagement",
+            ],
+            chapters=[
+                {"number": 1, "title": "Into the Magical Forest",  "pages": "1-4"},
+                {"number": 2, "title": "A Unicorn Friend",          "pages": "5-7"},
+                {"number": 3, "title": "The Enchanted Journey",     "pages": "8-10"},
+            ],
+            customization_options={"child_name": True, "child_photo": True, "dedication": True},
+            tags=["unicorn", "forest", "fantasy", "ai-generated", "personalised", "adventure"],
+            is_published=True,
+            # --- Replicate AI prompts config ---
+            prompts_config={
+                "negative_prompt": (
+                    "realistic, photograph, photorealistic, 3D render, blurry, low quality, "
+                    "distorted face, deformed face, ugly, extra faces, multiple faces, "
+                    "multiple persons, multiple characters, extra characters, duplicate characters, "
+                    "crowd, group of people, three or more characters, background persons, "
+                    "extra figures, extra bodies, clones, horn on human head, horn on boy, "
+                    "boy with horn, horn growing from boy head, horned boy, unicorn boy, "
+                    "boy with unicorn horn, any horn on human, horn attached to person, "
+                    "dark theme, scary, violent, adult content, text, watermark, signature"
+                ),
+                "pages": [
+                    {
+                        "page_number": 1,
+                        "story_line": "Once upon a time, a brave little child entered a magical forest.",
+                        "scene": "entering a magical forest",
+                        "background": "background: dense magical forest with tall glowing trees, colorful mushrooms, sparkling fireflies, soft golden light filtering through leaves",
+                        "prompt_male": (
+                            "children's storybook illustration, flat 2D pastel cartoon art style, "
+                            "background: dense magical forest with tall glowing trees, colorful mushrooms, sparkling fireflies, soft golden light filtering through leaves, "
+                            "scene: entering a magical forest, "
+                            "a single 6-year-old human boy named {child_name} standing in this scene, "
+                            "same face and identity as reference photo, big round expressive eyes, rosy cheeks, warm soft smile, "
+                            "short black hair, wearing colorful casual clothes, "
+                            "full body visible, bold outlines, bright saturated cartoon colors, hand-drawn cartoon look, "
+                            "vibrant pastel rainbow colors, soft glowing magical light, dreamy storybook atmosphere, "
+                            "high quality children's book illustration, sharp bold lines, clean flat cartoon artwork"
+                        ),
+                        "prompt_female": (
+                            "children's storybook illustration, flat 2D pastel cartoon art style, "
+                            "background: dense magical forest with tall glowing trees, colorful mushrooms, sparkling fireflies, soft golden light filtering through leaves, "
+                            "scene: entering a magical forest, "
+                            "a single 6-year-old human girl named {child_name} standing in this scene, "
+                            "same face and identity as reference photo, big round expressive eyes, rosy cheeks, warm soft smile, "
+                            "long black hair, wearing a colorful dress, "
+                            "full body visible, bold outlines, bright saturated cartoon colors, hand-drawn cartoon look, "
+                            "vibrant pastel rainbow colors, soft glowing magical light, dreamy storybook atmosphere, "
+                            "high quality children's book illustration, sharp bold lines, clean flat cartoon artwork"
+                        ),
+                    },
+                    {
+                        "page_number": 2,
+                        "story_line": "They followed a glowing path filled with sparkling lights.",
+                        "scene": "walking on a glowing path",
+                        "background": "background: bright glowing golden winding path through forest, sparkling lights and fireflies all around, glowing flowers on the sides",
+                        "prompt_male": (
+                            "children's storybook illustration, flat 2D pastel cartoon art style, "
+                            "background: bright glowing golden winding path through forest, sparkling lights and fireflies all around, glowing flowers on the sides, "
+                            "scene: walking on a glowing path, "
+                            "a single 6-year-old human boy named {child_name} standing in this scene, "
+                            "same face and identity as reference photo, big round expressive eyes, rosy cheeks, warm soft smile, "
+                            "short black hair, wearing colorful casual clothes, "
+                            "full body visible, bold outlines, bright saturated cartoon colors, hand-drawn cartoon look, "
+                            "vibrant pastel rainbow colors, soft glowing magical light, dreamy storybook atmosphere, "
+                            "high quality children's book illustration, sharp bold lines, clean flat cartoon artwork"
+                        ),
+                        "prompt_female": (
+                            "children's storybook illustration, flat 2D pastel cartoon art style, "
+                            "background: bright glowing golden winding path through forest, sparkling lights and fireflies all around, glowing flowers on the sides, "
+                            "scene: walking on a glowing path, "
+                            "a single 6-year-old human girl named {child_name} standing in this scene, "
+                            "same face and identity as reference photo, big round expressive eyes, rosy cheeks, warm soft smile, "
+                            "long black hair, wearing a colorful dress, "
+                            "full body visible, bold outlines, bright saturated cartoon colors, hand-drawn cartoon look, "
+                            "vibrant pastel rainbow colors, soft glowing magical light, dreamy storybook atmosphere, "
+                            "high quality children's book illustration, sharp bold lines, clean flat cartoon artwork"
+                        ),
+                    },
+                    {
+                        "page_number": 3,
+                        "story_line": "Suddenly, they met a magical unicorn with a golden horn.",
+                        "scene": "seeing a magical unicorn for the first time",
+                        "background": "background: sunny forest clearing with lush green grass, colorful wildflowers, rainbow arching across a blue sky",
+                        "prompt_male": (
+                            "children's storybook illustration, flat 2D pastel cartoon art style, "
+                            "background: sunny forest clearing with lush green grass, colorful wildflowers, rainbow arching across a blue sky, "
+                            "scene: seeing a magical unicorn for the first time, "
+                            "a single 6-year-old human boy named {child_name} standing in this scene, "
+                            "same face and identity as reference photo, big round expressive eyes, rosy cheeks, warm soft smile, "
+                            "short black hair, wearing colorful casual clothes, "
+                            "exactly one separate white unicorn with a single golden horn on its forehead standing beside the boy, "
+                            "only two characters in the scene: the boy and the unicorn, no other people, "
+                            "full body visible, bold outlines, bright saturated cartoon colors, hand-drawn cartoon look, "
+                            "vibrant pastel rainbow colors, soft glowing magical light, dreamy storybook atmosphere, "
+                            "high quality children's book illustration, sharp bold lines, clean flat cartoon artwork"
+                        ),
+                        "prompt_female": (
+                            "children's storybook illustration, flat 2D pastel cartoon art style, "
+                            "background: sunny forest clearing with lush green grass, colorful wildflowers, rainbow arching across a blue sky, "
+                            "scene: seeing a magical unicorn for the first time, "
+                            "a single 6-year-old human girl named {child_name} standing in this scene, "
+                            "same face and identity as reference photo, big round expressive eyes, rosy cheeks, warm soft smile, "
+                            "long black hair, wearing a colorful dress, "
+                            "exactly one separate white unicorn with a single golden horn on its forehead standing beside the girl, "
+                            "only two characters in the scene: the girl and the unicorn, no other people, "
+                            "full body visible, bold outlines, bright saturated cartoon colors, hand-drawn cartoon look, "
+                            "vibrant pastel rainbow colors, soft glowing magical light, dreamy storybook atmosphere, "
+                            "high quality children's book illustration, sharp bold lines, clean flat cartoon artwork"
+                        ),
+                    },
+                    {
+                        "page_number": 4,
+                        "story_line": "The unicorn smiled and welcomed them warmly.",
+                        "scene": "talking with the unicorn in a sunny forest clearing",
+                        "background": "background: flower-filled meadow with bright sunshine, giant colorful flowers, butterflies, fluffy white clouds in blue sky",
+                        "prompt_male": (
+                            "children's storybook illustration, flat 2D pastel cartoon art style, "
+                            "background: flower-filled meadow with bright sunshine, giant colorful flowers, butterflies, fluffy white clouds in blue sky, "
+                            "scene: talking with the unicorn in a sunny forest clearing, "
+                            "a single 6-year-old human boy named {child_name} standing in this scene, "
+                            "same face and identity as reference photo, big round expressive eyes, rosy cheeks, warm soft smile, "
+                            "short black hair, wearing colorful casual clothes, "
+                            "exactly one separate white unicorn with a single golden horn on its forehead standing beside the boy, "
+                            "only two characters in the scene: the boy and the unicorn, no other people, "
+                            "full body visible, bold outlines, bright saturated cartoon colors, hand-drawn cartoon look, "
+                            "vibrant pastel rainbow colors, soft glowing magical light, dreamy storybook atmosphere, "
+                            "high quality children's book illustration, sharp bold lines, clean flat cartoon artwork"
+                        ),
+                        "prompt_female": (
+                            "children's storybook illustration, flat 2D pastel cartoon art style, "
+                            "background: flower-filled meadow with bright sunshine, giant colorful flowers, butterflies, fluffy white clouds in blue sky, "
+                            "scene: talking with the unicorn in a sunny forest clearing, "
+                            "a single 6-year-old human girl named {child_name} standing in this scene, "
+                            "same face and identity as reference photo, big round expressive eyes, rosy cheeks, warm soft smile, "
+                            "long black hair, wearing a colorful dress, "
+                            "exactly one separate white unicorn with a single golden horn on its forehead standing beside the girl, "
+                            "only two characters in the scene: the girl and the unicorn, no other people, "
+                            "full body visible, bold outlines, bright saturated cartoon colors, hand-drawn cartoon look, "
+                            "vibrant pastel rainbow colors, soft glowing magical light, dreamy storybook atmosphere, "
+                            "high quality children's book illustration, sharp bold lines, clean flat cartoon artwork"
+                        ),
+                    },
+                    {
+                        "page_number": 5,
+                        "story_line": "Together, they walked deeper into the enchanted forest.",
+                        "scene": "walking together in forest",
+                        "background": "background: enchanted forest path with tall glowing pastel-colored trees, purple and green glowing leaves, magical sparkles floating in air",
+                        "prompt_male": (
+                            "children's storybook illustration, flat 2D pastel cartoon art style, "
+                            "background: enchanted forest path with tall glowing pastel-colored trees, purple and green glowing leaves, magical sparkles floating in air, "
+                            "scene: walking together in forest, "
+                            "a single 6-year-old human boy named {child_name} standing in this scene, "
+                            "same face and identity as reference photo, big round expressive eyes, rosy cheeks, warm soft smile, "
+                            "short black hair, wearing colorful casual clothes, "
+                            "exactly one separate white unicorn with a single golden horn on its forehead walking beside the boy, "
+                            "only two characters in the scene: the boy and the unicorn, no other people, "
+                            "full body visible, bold outlines, bright saturated cartoon colors, hand-drawn cartoon look, "
+                            "vibrant pastel rainbow colors, soft glowing magical light, dreamy storybook atmosphere, "
+                            "high quality children's book illustration, sharp bold lines, clean flat cartoon artwork"
+                        ),
+                        "prompt_female": (
+                            "children's storybook illustration, flat 2D pastel cartoon art style, "
+                            "background: enchanted forest path with tall glowing pastel-colored trees, purple and green glowing leaves, magical sparkles floating in air, "
+                            "scene: walking together in forest, "
+                            "a single 6-year-old human girl named {child_name} standing in this scene, "
+                            "same face and identity as reference photo, big round expressive eyes, rosy cheeks, warm soft smile, "
+                            "long black hair, wearing a colorful dress, "
+                            "exactly one separate white unicorn with a single golden horn on its forehead walking beside the girl, "
+                            "only two characters in the scene: the girl and the unicorn, no other people, "
+                            "full body visible, bold outlines, bright saturated cartoon colors, hand-drawn cartoon look, "
+                            "vibrant pastel rainbow colors, soft glowing magical light, dreamy storybook atmosphere, "
+                            "high quality children's book illustration, sharp bold lines, clean flat cartoon artwork"
+                        ),
+                    },
+                    {
+                        "page_number": 6,
+                        "story_line": "They crossed a shining river full of glowing fish.",
+                        "scene": "crossing glowing river",
+                        "background": "background: shimmering glowing turquoise river with colorful glowing fish visible in water, rainbow-colored lily pads, waterfall in distance",
+                        "prompt_male": (
+                            "children's storybook illustration, flat 2D pastel cartoon art style, "
+                            "background: shimmering glowing turquoise river with colorful glowing fish visible in water, rainbow-colored lily pads, waterfall in distance, "
+                            "scene: crossing glowing river, "
+                            "a single 6-year-old human boy named {child_name} standing in this scene, "
+                            "same face and identity as reference photo, big round expressive eyes, rosy cheeks, warm soft smile, "
+                            "short black hair, wearing colorful casual clothes, "
+                            "exactly one separate white unicorn with a single golden horn on its forehead standing beside the boy, "
+                            "only two characters in the scene: the boy and the unicorn, no other people, "
+                            "full body visible, bold outlines, bright saturated cartoon colors, hand-drawn cartoon look, "
+                            "vibrant pastel rainbow colors, soft glowing magical light, dreamy storybook atmosphere, "
+                            "high quality children's book illustration, sharp bold lines, clean flat cartoon artwork"
+                        ),
+                        "prompt_female": (
+                            "children's storybook illustration, flat 2D pastel cartoon art style, "
+                            "background: shimmering glowing turquoise river with colorful glowing fish visible in water, rainbow-colored lily pads, waterfall in distance, "
+                            "scene: crossing glowing river, "
+                            "a single 6-year-old human girl named {child_name} standing in this scene, "
+                            "same face and identity as reference photo, big round expressive eyes, rosy cheeks, warm soft smile, "
+                            "long black hair, wearing a colorful dress, "
+                            "exactly one separate white unicorn with a single golden horn on its forehead standing beside the girl, "
+                            "only two characters in the scene: the girl and the unicorn, no other people, "
+                            "full body visible, bold outlines, bright saturated cartoon colors, hand-drawn cartoon look, "
+                            "vibrant pastel rainbow colors, soft glowing magical light, dreamy storybook atmosphere, "
+                            "high quality children's book illustration, sharp bold lines, clean flat cartoon artwork"
+                        ),
+                    },
+                    {
+                        "page_number": 7,
+                        "story_line": "They climbed a hill under a beautiful rainbow sky.",
+                        "scene": "standing under rainbow on hill",
+                        "background": "background: grassy hilltop with a massive vibrant rainbow filling the entire sky, fluffy clouds, rolling green hills below",
+                        "prompt_male": (
+                            "children's storybook illustration, flat 2D pastel cartoon art style, "
+                            "background: grassy hilltop with a massive vibrant rainbow filling the entire sky, fluffy clouds, rolling green hills below, "
+                            "scene: standing under rainbow on hill, "
+                            "a single 6-year-old human boy named {child_name} standing in this scene, "
+                            "same face and identity as reference photo, big round expressive eyes, rosy cheeks, warm soft smile, "
+                            "short black hair, wearing colorful casual clothes, "
+                            "exactly one separate white unicorn with a single golden horn on its forehead standing beside the boy, "
+                            "only two characters in the scene: the boy and the unicorn, no other people, "
+                            "full body visible, bold outlines, bright saturated cartoon colors, hand-drawn cartoon look, "
+                            "vibrant pastel rainbow colors, soft glowing magical light, dreamy storybook atmosphere, "
+                            "high quality children's book illustration, sharp bold lines, clean flat cartoon artwork"
+                        ),
+                        "prompt_female": (
+                            "children's storybook illustration, flat 2D pastel cartoon art style, "
+                            "background: grassy hilltop with a massive vibrant rainbow filling the entire sky, fluffy clouds, rolling green hills below, "
+                            "scene: standing under rainbow on hill, "
+                            "a single 6-year-old human girl named {child_name} standing in this scene, "
+                            "same face and identity as reference photo, big round expressive eyes, rosy cheeks, warm soft smile, "
+                            "long black hair, wearing a colorful dress, "
+                            "exactly one separate white unicorn with a single golden horn on its forehead standing beside the girl, "
+                            "only two characters in the scene: the girl and the unicorn, no other people, "
+                            "full body visible, bold outlines, bright saturated cartoon colors, hand-drawn cartoon look, "
+                            "vibrant pastel rainbow colors, soft glowing magical light, dreamy storybook atmosphere, "
+                            "high quality children's book illustration, sharp bold lines, clean flat cartoon artwork"
+                        ),
+                    },
+                    {
+                        "page_number": 8,
+                        "story_line": "They discovered a hidden land full of wonders.",
+                        "scene": "exploring magical land",
+                        "background": "background: magical fantasy land with colorful candy-colored castles, floating islands, rainbow bridges, glowing flowers everywhere",
+                        "prompt_male": (
+                            "children's storybook illustration, flat 2D pastel cartoon art style, "
+                            "background: magical fantasy land with colorful candy-colored castles, floating islands, rainbow bridges, glowing flowers everywhere, "
+                            "scene: exploring magical land, "
+                            "a single 6-year-old human boy named {child_name} standing in this scene, "
+                            "same face and identity as reference photo, big round expressive eyes, rosy cheeks, warm soft smile, "
+                            "short black hair, wearing colorful casual clothes, "
+                            "exactly one separate white unicorn with a single golden horn on its forehead standing beside the boy, "
+                            "only two characters in the scene: the boy and the unicorn, no other people, "
+                            "full body visible, bold outlines, bright saturated cartoon colors, hand-drawn cartoon look, "
+                            "vibrant pastel rainbow colors, soft glowing magical light, dreamy storybook atmosphere, "
+                            "high quality children's book illustration, sharp bold lines, clean flat cartoon artwork"
+                        ),
+                        "prompt_female": (
+                            "children's storybook illustration, flat 2D pastel cartoon art style, "
+                            "background: magical fantasy land with colorful candy-colored castles, floating islands, rainbow bridges, glowing flowers everywhere, "
+                            "scene: exploring magical land, "
+                            "a single 6-year-old human girl named {child_name} standing in this scene, "
+                            "same face and identity as reference photo, big round expressive eyes, rosy cheeks, warm soft smile, "
+                            "long black hair, wearing a colorful dress, "
+                            "exactly one separate white unicorn with a single golden horn on its forehead standing beside the girl, "
+                            "only two characters in the scene: the girl and the unicorn, no other people, "
+                            "full body visible, bold outlines, bright saturated cartoon colors, hand-drawn cartoon look, "
+                            "vibrant pastel rainbow colors, soft glowing magical light, dreamy storybook atmosphere, "
+                            "high quality children's book illustration, sharp bold lines, clean flat cartoon artwork"
+                        ),
+                    },
+                    {
+                        "page_number": 9,
+                        "story_line": "The child learned the true meaning of courage and friendship.",
+                        "scene": "smiling with unicorn friendship moment",
+                        "background": "background: warm golden sunset meadow with orange and pink sky, glowing flowers, soft sparkles drifting in breeze",
+                        "prompt_male": (
+                            "children's storybook illustration, flat 2D pastel cartoon art style, "
+                            "background: warm golden sunset meadow with orange and pink sky, glowing flowers, soft sparkles drifting in breeze, "
+                            "scene: smiling with unicorn friendship moment, "
+                            "a single 6-year-old human boy named {child_name} standing in this scene, "
+                            "same face and identity as reference photo, big round expressive eyes, rosy cheeks, warm soft smile, "
+                            "short black hair, wearing colorful casual clothes, "
+                            "exactly one separate white unicorn with a single golden horn on its forehead standing beside the boy, "
+                            "only two characters in the scene: the boy and the unicorn, no other people, "
+                            "full body visible, bold outlines, bright saturated cartoon colors, hand-drawn cartoon look, "
+                            "vibrant pastel rainbow colors, soft glowing magical light, dreamy storybook atmosphere, "
+                            "high quality children's book illustration, sharp bold lines, clean flat cartoon artwork"
+                        ),
+                        "prompt_female": (
+                            "children's storybook illustration, flat 2D pastel cartoon art style, "
+                            "background: warm golden sunset meadow with orange and pink sky, glowing flowers, soft sparkles drifting in breeze, "
+                            "scene: smiling with unicorn friendship moment, "
+                            "a single 6-year-old human girl named {child_name} standing in this scene, "
+                            "same face and identity as reference photo, big round expressive eyes, rosy cheeks, warm soft smile, "
+                            "long black hair, wearing a colorful dress, "
+                            "exactly one separate white unicorn with a single golden horn on its forehead standing beside the girl, "
+                            "only two characters in the scene: the girl and the unicorn, no other people, "
+                            "full body visible, bold outlines, bright saturated cartoon colors, hand-drawn cartoon look, "
+                            "vibrant pastel rainbow colors, soft glowing magical light, dreamy storybook atmosphere, "
+                            "high quality children's book illustration, sharp bold lines, clean flat cartoon artwork"
+                        ),
+                    },
+                    {
+                        "page_number": 10,
+                        "story_line": "They returned home with a heart full of magical memories.",
+                        "scene": "returning home at sunset",
+                        "background": "background: cozy village at golden sunset, warm orange sky with glowing sun on the horizon, small colorful houses visible in distance",
+                        "prompt_male": (
+                            "children's storybook illustration, flat 2D pastel cartoon art style, "
+                            "background: cozy village at golden sunset, warm orange sky with glowing sun on the horizon, small colorful houses visible in distance, "
+                            "scene: returning home at sunset, "
+                            "a single 6-year-old human boy named {child_name} standing in this scene, "
+                            "same face and identity as reference photo, big round expressive eyes, rosy cheeks, warm soft smile, "
+                            "short black hair, wearing colorful casual clothes, "
+                            "full body visible, bold outlines, bright saturated cartoon colors, hand-drawn cartoon look, "
+                            "vibrant pastel rainbow colors, soft glowing magical light, dreamy storybook atmosphere, "
+                            "high quality children's book illustration, sharp bold lines, clean flat cartoon artwork"
+                        ),
+                        "prompt_female": (
+                            "children's storybook illustration, flat 2D pastel cartoon art style, "
+                            "background: cozy village at golden sunset, warm orange sky with glowing sun on the horizon, small colorful houses visible in distance, "
+                            "scene: returning home at sunset, "
+                            "a single 6-year-old human girl named {child_name} standing in this scene, "
+                            "same face and identity as reference photo, big round expressive eyes, rosy cheeks, warm soft smile, "
+                            "long black hair, wearing a colorful dress, "
+                            "full body visible, bold outlines, bright saturated cartoon colors, hand-drawn cartoon look, "
+                            "vibrant pastel rainbow colors, soft glowing magical light, dreamy storybook atmosphere, "
+                            "high quality children's book illustration, sharp bold lines, clean flat cartoon artwork"
+                        ),
+                    },
+                ],
+            },
         ),
     ]
 

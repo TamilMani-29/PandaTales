@@ -52,8 +52,8 @@ export default function TermsPage() {
               </li>
               <li>
                 You agree to notify us immediately at{' '}
-                <a href="mailto:hello@pandorapages.in" className="text-[#6B21A8] underline">
-                  hello@pandorapages.in
+                <a href="mailto:info.pandorapages@gmail.com" className="text-[#6B21A8] underline">
+                  info.pandorapages@gmail.com
                 </a>{' '}
                 if you suspect unauthorised access.
               </li>
@@ -189,8 +189,8 @@ export default function TermsPage() {
             <h2 className="text-xl font-bold mb-3">14. Contact Us</h2>
             <p className="text-muted-foreground leading-relaxed">
               For any questions about these Terms, please contact us at{' '}
-              <a href="mailto:hello@pandorapages.in" className="text-[#6B21A8] underline">
-                hello@pandorapages.in
+              <a href="mailto:info.pandorapages@gmail.com" className="text-[#6B21A8] underline">
+                info.pandorapages@gmail.com
               </a>
               .
             </p>

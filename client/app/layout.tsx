@@ -2,7 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { Quicksand, Inter } from 'next/font/google';
 import { ReactQueryProvider } from '@/lib/providers/react-query-provider';
-import { AuthProvider } from '@/lib/providers/auth-provider';
+// AUTH: import { AuthProvider } from '@/lib/providers/auth-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { Header } from '@/components/layout/header';
 import { FloatingClouds } from '@/components/shared/floating-clouds';
@@ -35,12 +35,12 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${quicksand.variable} ${inter.variable} font-sans`}>
         <ReactQueryProvider>
-          <AuthProvider>
+          {/* AUTH: <AuthProvider> — re-enable when authentication is introduced */}
             <FloatingClouds />
             <Header />
             {children}
             <Toaster />
-          </AuthProvider>
+          {/* AUTH: </AuthProvider> */}
         </ReactQueryProvider>
       </body>
     </html>

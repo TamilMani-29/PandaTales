@@ -5,7 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { useStoryBook, useColoringBook } from '@/features/books/hooks/useBooks';
+import { useBookPreview } from '@/features/books/hooks/useBooks';
 import { useCreateOrder, useVerifyPayment } from '@/features/checkout/hooks/useCheckout';
 import { Loader as Loader2, BookOpen, Check, Download, Printer, ShieldCheck, CheckCircle2, MessageCircle, Mail, Home, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
@@ -14,6 +14,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import confetti from 'canvas-confetti';
 import { mockProcessPayment } from '@/lib/mock-api/mock-generation.service';
+import { storyBookTemplatesService } from '@/features/books/services/story-book-templates.service';
 
 // TODO: Set to false (and remove the mock block in handleCheckout below) when
 //       Razorpay keys are configured in the environment.
@@ -84,17 +85,29 @@ export default function CheckoutPage() {
   const [selectedFormat, setSelectedFormat] = useState<Format>(initialFormat);
   const [isProcessing, setIsProcessing] = useState(false);
   const [confirmedFormat, setConfirmedFormat] = useState<Format | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [activeSlide, setActiveSlide] = useState(0);
 
-  const { data: storyBook } = useStoryBook(bookId);
-  const { data: coloringBook } = useColoringBook(bookId);
-  const book = storyBook || coloringBook;
+  // Fetch generated book data
+  const { data: bookPreview, isLoading: isLoadingBook } = useBookPreview(bookId);
+
+  // Map preview data to checkout format
+  const book = useMemo(() => {
+    if (!bookPreview) return null;
+    return {
+      id: bookPreview.id,
+      title: bookPreview.templateTitle,
+      coverImage: bookPreview.coverImageUrl,
+      previewImages: bookPreview.previewPages || [],
+      childName: bookPreview.childName,
+      totalPages: bookPreview.totalPages,
+    };
+  }, [bookPreview]);
 
   const allImages = useMemo(() => {
     if (!book) return [];
-    // StoryBook has coverImage + previewImages; ColoringBookTemplateListItem has coverImageUrl
-    const cover = 'coverImage' in book ? book.coverImage : (book as any).coverImageUrl;
-    const previews: string[] = 'previewImages' in book ? (book as any).previewImages ?? [] : [];
+    const cover = book.coverImage;
+    const previews = book.previewImages ?? [];
     return [cover, ...previews].filter(Boolean).slice(0, 5) as string[];
   }, [book]);
 
@@ -223,11 +236,11 @@ export default function CheckoutPage() {
               {/* Book summary strip */}
               <div className="flex items-center gap-4 bg-muted/50 rounded-2xl p-4 mb-6 text-left">
                 <div className="relative w-14 h-18 flex-shrink-0 rounded-lg overflow-hidden">
-                  <Image src={book.coverImage} alt={book.title} fill className="object-cover" />
+                  <Image src={(book as any).coverImage} alt={(book as any).title} fill className="object-cover" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold truncate">{book.title}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{formatLabel} · {book.totalPages} pages</p>
+                  <p className="font-semibold truncate">{(book as any).title}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{formatLabel} · {(book as any).totalPages} pages</p>
                 </div>
               </div>
 
@@ -256,23 +269,36 @@ export default function CheckoutPage() {
               ) : (
                 <div className="rounded-2xl border-2 border-[#6B21A8]/20 bg-[#6B21A8]/5 p-5 text-left mb-6">
                   <div className="flex items-center gap-2 mb-3">
-                    <Mail className="h-5 w-5 text-[#6B21A8] flex-shrink-0" />
-                    <span className="font-semibold text-[#6B21A8]">What happens next?</span>
+                    <Download className="h-5 w-5 text-[#6B21A8] flex-shrink-0" />
+                    <span className="font-semibold text-[#6B21A8]">Your PDF is ready!</span>
                   </div>
-                  <ul className="space-y-2 text-sm text-[#6B21A8]/80">
-                    <li className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-[#6B21A8] mt-0.5 flex-shrink-0" />
-                      Your personalised PDF is being prepared right now.
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-[#6B21A8] mt-0.5 flex-shrink-0" />
-                      It will be sent to your email shortly — check your inbox (and spam folder).
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-[#6B21A8] mt-0.5 flex-shrink-0" />
-                      You can print it at home or at any print shop, as many times as you like.
-                    </li>
-                  </ul>
+                  <p className="text-sm text-[#6B21A8]/80 mb-4">
+                    Click below to download your personalised storybook PDF. You can print it at home or at any print shop, as many times as you like.
+                  </p>
+                  <Button
+                    size="sm"
+                    className="w-full bg-[#6B21A8] hover:bg-[#581C87] gap-2"
+                    disabled={isDownloading}
+                    onClick={async () => {
+                      setIsDownloading(true);
+                      try {
+                        const childName = (book as any)?.childName ?? 'storybook';
+                        await storyBookTemplatesService.downloadBookPdf(bookId, childName);
+                        toast.success('PDF downloaded!');
+                      } catch {
+                        toast.error('Download failed. Please try again.');
+                      } finally {
+                        setIsDownloading(false);
+                      }
+                    }}
+                  >
+                    {isDownloading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                    {isDownloading ? 'Preparing PDF…' : 'Download PDF'}
+                  </Button>
                 </div>
               )}
 
@@ -375,13 +401,12 @@ export default function CheckoutPage() {
                 </div>
                 <CardContent className="p-6">
                   <h2 className="text-xl font-bold mb-1">{book.title}</h2>
-                  <p className="text-muted-foreground text-sm">{book.description}</p>
+                  <p className="text-muted-foreground text-sm">Personalized for {(book as any).childName}</p>
                   <div className="mt-4 flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">
                       <BookOpen className="inline h-4 w-4 mr-1" />
-                      {book.totalPages} pages
+                      {(book as any).totalPages} pages
                     </span>
-                    <span className="text-muted-foreground">Ages {book.ageGroup}</span>
                   </div>
                 </CardContent>
               </Card>

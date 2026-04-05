@@ -112,6 +112,9 @@ class GeneratedBook(Base, BaseModel):
     total_pages: Mapped[int | None] = mapped_column(Integer, nullable=True)
     preview_pages: Mapped[list[dict] | None] = mapped_column(JSONB, nullable=True)
 
+    # Replicate predictions tracking — {"page_0": {"prediction_id": "...", "status": "...", "image_object": "..."}, ...}
+    replicate_prediction_ids: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+
     # Purchase status
     is_purchased: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, index=True

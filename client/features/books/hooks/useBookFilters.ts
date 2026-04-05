@@ -15,15 +15,15 @@ export function useBookFilters<T extends StoryBook | ColoringBook>(
         return false;
       }
 
-      if (filters.ageGroup && book.ageGroup !== filters.ageGroup) {
+      if (filters.ageGroup?.length && !filters.ageGroup.includes(book.ageGroup)) {
         return false;
       }
 
-      if (filters.genre && book.genre !== filters.genre) {
+      if (filters.genre?.length && !filters.genre.includes(book.genre)) {
         return false;
       }
 
-      if ('type' in book && filters.type && book.type !== filters.type) {
+      if ('type' in book && filters.type?.length && !filters.type.includes((book as { type: string }).type as import('@/types/book.types').BookType)) {
         return false;
       }
 
