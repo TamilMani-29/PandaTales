@@ -67,7 +67,9 @@ celerybeat.pid
 
 # MinIO/S3 local data
 .minio.sys/
-data/
+
+# Data files - exclude config with credentials
+data/seed_config.json
 
 # Temp files
 tmp/

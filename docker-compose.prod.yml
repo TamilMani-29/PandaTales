@@ -1,0 +1,116 @@
+########################################
+# Docker Compose - Production Override
+########################################
+# 
+# ⚠️ IMPORTANT: This is an OVERRIDE file, NOT standalone!
+# ⚠️ Running this file alone will fail with network errors!
+# 
+# ✅ CORRECT USAGE:
+#    docker-compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod up -d
+#    OR
+#    docker-compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.production up -d
+#
+# ❌ WRONG (will fail):
+#    docker-compose -f docker-compose.prod.yml up
+#
+
+services:
+  # PostgreSQL Database - Production Container
+  postgres:
+    container_name: pandatales_postgres_prod
+    restart: always
+    environment:
+      # Use strong passwords in production (set via .env.prod)
+      POSTGRES_USER: ${POSTGRES_USER:-pandatales_prod}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}  # Required in production - set in .env.prod
+      POSTGRES_DB: ${POSTGRES_DB:-pandatales_prod}
+    # Expose port only if needed for external tools (remove in locked-down environments)
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+
+  # MinIO Object Storage - Production Container
+  minio:
+    container_name: pandatales_minio_prod
+    restart: always
+    environment:
+      # Use strong credentials in production (set via .env.prod)
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}  # Required in production - set in .env.prod
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}  # Required in production - set in .env.prod
+    # Expose ports only if needed (remove console port 9001 in locked-down environments)
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+
+  backend:
+    container_name: pandatales_backend_prod
+    restart: always
+    environment:
+      # App Settings - Production
+      DEBUG: "false"
+      APP_ENV: production
+      
+      # Database - Production (connects to containerized PostgreSQL)
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-pandatales_prod}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-pandatales_prod}
+      
+      # MinIO - Production (connects to containerized MinIO)
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET:-pandatales}
+      MINIO_SECURE: "false"
+      
+      # JWT - Production (REQUIRED - set strong secrets in .env.prod)
+      SECRET_KEY: ${SECRET_KEY}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      
+      # CORS - Production (set your production domain)
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://yourdomain.com}
+      
+      # API Keys - Production (set in .env.prod)
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY}
+      REPLICATE_API_TOKEN: ${REPLICATE_API_TOKEN:-}
+      
+    # Mount only data directory in production
+    volumes:
+      - ./server/data:/app/data
+    command: >
+      sh -c "
+        echo 'Production mode - running migrations...' &&
+        alembic upgrade head &&
+        echo 'Waiting for migrations to commit...' &&
+        sleep 3 &&
+        echo 'Auto-seeding story book templates...' &&
+        python scripts/auto_seed.py &&
+        echo 'Starting production server with Gunicorn...' &&
+        gunicorn app.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --access-logfile - --error-logfile -
+      "
+
+  frontend:
+    container_name: pandatales_frontend_prod
+    restart: always
+    # Remove volume mounts in production
+    volumes: []
+    environment:
+      NODE_ENV: production
+
+  # Nginx Reverse Proxy (Production)
+  nginx:
+    image: nginx:alpine
+    container_name: pandatales_nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - pandatales_network

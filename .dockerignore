@@ -1,0 +1,55 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Node modules (handled per service)
+node_modules/
+
+# Python virtual environments
+venv/
+.venv/
+env/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Testing
+coverage/
+.pytest_cache/
+.coverage
+
+# Temporary files
+tmp/
+temp/
+*.tmp

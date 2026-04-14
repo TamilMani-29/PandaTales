@@ -17,29 +17,43 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Add Replicate prediction tracking column to generated_books
-    op.add_column(
-        "generated_books",
-        sa.Column(
-            "replicate_prediction_ids",
-            JSONB(),
-            nullable=True,
-            comment="Per-page Replicate prediction tracking: {page_0: {prediction_id, status, image_object}}",
-        ),
-    )
+    # Check if tables exist before adding columns
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    existing_tables = inspector.get_table_names()
+    
+    # Add Replicate prediction tracking column to generated_books if table exists
+    if "generated_books" in existing_tables:
+        op.add_column(
+            "generated_books",
+            sa.Column(
+                "replicate_prediction_ids",
+                JSONB(),
+                nullable=True,
+                comment="Per-page Replicate prediction tracking: {page_0: {prediction_id, status, image_object}}",
+            ),
+        )
 
-    # Add AI generation prompts config to story_book_templates
-    op.add_column(
-        "story_book_templates",
-        sa.Column(
-            "prompts_config",
-            JSONB(),
-            nullable=True,
-            comment="AI generation prompts configuration: story_lines, scenes, backgrounds, pages[]",
-        ),
-    )
+    # Add AI generation prompts config to story_book_templates if table exists
+    if "story_book_templates" in existing_tables:
+        op.add_column(
+            "story_book_templates",
+            sa.Column(
+                "prompts_config",
+                JSONB(),
+                nullable=True,
+                comment="AI generation prompts configuration: story_lines, scenes, backgrounds, pages[]",
+            ),
+        )
 
 
 def downgrade() -> None:
-    op.drop_column("generated_books", "replicate_prediction_ids")
-    op.drop_column("story_book_templates", "prompts_config")
+    # Check if tables exist before dropping columns
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    existing_tables = inspector.get_table_names()
+   
+    if "generated_books" in existing_tables:
+        op.drop_column("generated_books", "replicate_prediction_ids")
+    if "story_book_templates" in existing_tables:
+        op.drop_column("story_book_templates", "prompts_config")

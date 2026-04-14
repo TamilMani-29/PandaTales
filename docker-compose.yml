@@ -1,0 +1,172 @@
+########################################
+# PandaTales - Full Stack Docker Compose
+########################################
+# 
+# This is the BASE/DEFAULT compose file for development
+# 
+# Usage:
+#   Quick Dev (base):      docker-compose up
+#   Dev (standalone):      docker-compose -f docker-compose.dev.yml up
+#   Production:            docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#   
+#   Build:                 docker-compose build
+#   Down:                  docker-compose down
+#   Clean (delete data):   docker-compose down -v
+#
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: pandatales_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pandatales}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pandatales_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-pandatales}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pandatales}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pandatales_network
+
+  # MinIO Object Storage
+  minio:
+    image: minio/minio:latest
+    container_name: pandatales_minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - pandatales_network
+
+  # MinIO Client - Initialize buckets
+  minio_init:
+    image: minio/mc:latest
+    container_name: pandatales_minio_init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin123};
+      /usr/bin/mc mb --ignore-existing myminio/${MINIO_BUCKET:-pandatales};
+      /usr/bin/mc anonymous set download myminio/${MINIO_BUCKET:-pandatales};
+      exit 0;
+      "
+    networks:
+      - pandatales_network
+
+  # Backend API (FastAPI)
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: pandatales_backend
+    restart: unless-stopped
+    environment:
+      # Python Path
+      PYTHONPATH: /app
+      
+      # Database
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-pandatales}:${POSTGRES_PASSWORD:-pandatales_dev_password}@postgres:5432/${POSTGRES_DB:-pandatales}
+      
+      # MinIO
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      MINIO_BUCKET: ${MINIO_BUCKET:-pandatales}
+      MINIO_SECURE: "false"
+      
+      # JWT
+      SECRET_KEY: ${SECRET_KEY:-dev_secret_key_at_least_32_characters_long_12345}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev_jwt_secret_key_change_in_production}
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      
+      # App Settings
+      APP_ENV: ${APP_ENV:-development}
+      DEBUG: ${DEBUG:-true}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
+      
+      # API Keys (Optional - set via .env)
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+      
+    volumes:
+      - ./server/app:/app/app
+      - ./server/alembic:/app/alembic
+      - ./server/data:/app/data
+      - ./server/scripts:/app/scripts
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio_init:
+        condition: service_completed_successfully
+    networks:
+      - pandatales_network
+    command: >
+      sh -c "
+        echo 'Waiting for dependencies...' &&
+        sleep 3 &&
+        echo 'Running database migrations...' &&
+        alembic upgrade head &&        echo 'Waiting for migrations to commit...' &&
+        sleep 3 &&        echo 'Auto-seeding story book templates...' &&
+        python scripts/auto_seed.py &&
+        echo 'Starting FastAPI server...' &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      "
+
+  # Frontend (Next.js)
+  frontend:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      target: runner
+    container_name: pandatales_frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      - backend
+    networks:
+      - pandatales_network
+
+volumes:
+  postgres_data:
+    driver: local
+  minio_data:
+    driver: local
+
+networks:
+  pandatales_network:
+    driver: bridge

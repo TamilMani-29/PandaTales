@@ -1,0 +1,100 @@
+[
+  {
+    "id": "00000000-0000-0000-0003-000000000001",
+    "title": "Magical Unicorn Forest Adventure",
+    "description": "A brave young child embarks on an enchanting journey through a magical forest where they meet a beautiful unicorn and discover the true meaning of courage and friendship.",
+    "long_description": "Join your child on an unforgettable adventure through an enchanted forest filled with wonder and magic. In this personalized storybook, your little one becomes the hero of their own tale, meeting a magnificent unicorn with a golden horn. Together, they explore glowing paths, cross shimmering rivers, climb rainbow hills, and discover a hidden magical land. This heartwarming story teaches valuable lessons about bravery, friendship, and believing in yourself. Each page features vibrant, pastel-colored illustrations in a charming flat cartoon style that brings the magical world to life.",
+    "book_type": "single",
+    "series_id": null,
+    "book_number": null,
+    "genre": "fantasy",
+    "age_group": "3-5",
+    "story_theme": "courage and friendship",
+    "moral_lesson": "True courage comes from believing in yourself, and the best adventures are those shared with friends.",
+    "reading_level": "beginner",
+    "price": 16.99,
+    "cover_image_url": "https://picsum.photos/seed/unicorn1/400/500",
+    "preview_images": [
+      "https://picsum.photos/seed/unicorn10/800/600",
+      "https://picsum.photos/seed/unicorn11/800/600",
+      "https://picsum.photos/seed/unicorn12/800/600"
+    ],
+    "total_pages": 10,
+    "features": [
+      "Personalized with your child's photo and name",
+      "Vibrant pastel cartoon illustrations",
+      "Age-appropriate magical adventure story",
+      "Character consistency using AI technology",
+      "Beautiful unicorn companion character",
+      "10 unique magical scenes"
+    ],
+    "learning_outcomes": [
+      "Develops early reading skills",
+      "Teaches courage and bravery",
+      "Encourages friendship and kindness",
+      "Sparks imagination and creativity",
+      "Builds confidence and self-belief"
+    ],
+    "chapters": [
+      {"number": 1, "title": "Into the Magical Forest", "pages": "1-2"},
+      {"number": 2, "title": "Meeting the Unicorn", "pages": "3-4"},
+      {"number": 3, "title": "Magical Adventures Together", "pages": "5-8"},
+      {"number": 4, "title": "Journey Home", "pages": "9-10"}
+    ],
+    "prompts_config": {
+      "model_version": "467d062309da518648ba89d226490e02b8ed09b5abc15026e54e31c5a8cd0769",
+      "style": "children's storybook illustration, flat 2D pastel cartoon art style, hand-drawn cartoon look, vibrant pastel rainbow colors, soft glowing magical light, dreamy storybook atmosphere, bold outlines, bright saturated cartoon colors, high quality children's book illustration, sharp bold lines, clean flat cartoon artwork",
+      "story_lines": [
+        "Once upon a time, a brave little child entered a magical forest.",
+        "The child followed a glowing path filled with sparkling lights.",
+        "Suddenly, they met a magical unicorn with a golden horn.",
+        "The unicorn smiled and welcomed them warmly.",
+        "Together, they walked deeper into the enchanted forest.",
+        "They crossed a shining river full of glowing fish.",
+        "They climbed a hill under a beautiful rainbow sky.",
+        "They discovered a hidden land full of wonders.",
+        "The child learned the true meaning of courage and friendship.",
+        "They returned home with a heart full of magical memories."
+      ],
+      "scenes": [
+        "entering a magical forest",
+        "walking on a glowing path",
+        "seeing a magical unicorn for the first time",
+        "talking with the unicorn in a sunny forest clearing",
+        "walking together in forest",
+        "crossing glowing river",
+        "standing under rainbow on hill",
+        "exploring magical land",
+        "smiling with unicorn friendship moment",
+        "returning home at sunset"
+      ],
+      "backgrounds": [
+        "dense magical forest with tall glowing trees, colorful mushrooms, sparkling fireflies, soft golden light filtering through leaves",
+        "bright glowing golden winding path through forest, sparkling lights and fireflies all around, glowing flowers on the sides",
+        "sunny forest clearing with lush green grass, colorful wildflowers, rainbow arching across a blue sky",
+        "flower-filled meadow with bright sunshine, giant colorful flowers, butterflies, fluffy white clouds in blue sky",
+        "enchanted forest path with tall glowing pastel-colored trees, purple and green glowing leaves, magical sparkles floating in air",
+        "shimmering glowing turquoise river with colorful glowing fish visible in water, rainbow-colored lily pads, waterfall in distance",
+        "grassy hilltop with a massive vibrant rainbow filling the entire sky, fluffy clouds, rolling green hills below",
+        "magical fantasy land with colorful candy-colored castles, floating islands, rainbow bridges, glowing flowers everywhere",
+        "warm golden sunset meadow with orange and pink sky, glowing flowers, soft sparkles drifting in breeze",
+        "cozy village at golden sunset, warm orange sky with glowing sun on the horizon, small colorful houses visible in distance"
+      ],
+      "character_description": "a single 6-year-old human child standing in this scene, same face and identity as reference photo, big round expressive eyes, rosy cheeks, warm soft smile, long hair, wearing a colorful dress or outfit, the child has NO horn, the child is fully human with a plain head, horns only on the unicorn not on the child",
+      "unicorn_description": "exactly one separate white unicorn with a single golden horn on its forehead standing beside the child, majestic and friendly appearance, flowing colorful mane",
+      "composition": "only two characters in the scene: the child and the unicorn, no other people, full body visible",
+      "negative_prompt": "realistic, photograph, photorealistic, 3D render, blurry, low quality, distorted face, deformed face, ugly, extra faces, multiple faces, multiple persons, multiple characters, extra characters, duplicate characters, crowd, group of people, three or more characters, background persons, extra figures, extra bodies, clones, horn on human head, horn on child, child with horn, horn growing from child head, horned child, unicorn child, child with unicorn horn, any horn on human, horn attached to person, dark theme, scary, violent, adult content, text, watermark, signature",
+      "guidance_scale": 10,
+      "requires_reference_photo": true
+    },
+    "customization_options": {
+      "child_name": true,
+      "child_age": true,
+      "child_gender": true,
+      "child_photo": true,
+      "dedication": true
+    },
+    "tags": ["unicorn", "magical", "forest", "adventure", "friendship", "courage", "fantasy", "personalized", "AI-generated"],
+    "is_published": true
+  }
+]
