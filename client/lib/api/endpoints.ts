@@ -24,6 +24,12 @@ export const ENDPOINTS = {
     getById: (id: string) => `/v1/books/${id}`,
     list: '/v1/books/generated',
   },
+  digitalBooks: {
+    list: '/v1/digital-books',
+    details: (id: number | string) => `/v1/digital-books/${id}`,
+    filterOptions: '/v1/digital-books/filter-options',
+    sendPdfEmail: '/v1/digital-books/send-pdf-email',
+  },
   checkout: {
     createOrder: '/v1/checkout/create-order',
     verifyPayment: '/v1/checkout/verify-payment',

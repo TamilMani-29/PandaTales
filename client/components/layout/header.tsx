@@ -18,6 +18,7 @@ import { Menu, X } from 'lucide-react';
 
 
 const navLinks = [
+  { href: '/digital-books', label: 'Digital Book @ ₹99' },
   { href: '/coloring-books', label: 'Coloring Books' },
   { href: '/story-books', label: 'Story Books' },
   { href: '/about', label: 'About' },

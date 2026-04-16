@@ -11,10 +11,12 @@ from fastapi.responses import JSONResponse
 
 from app.api import api_router
 from app.common import (
+    AppException,
     BadRequestException,
     ConflictException,
     ForbiddenException,
     NotFoundException,
+    ServiceUnavailableException,
     UnauthorizedException,
     ValidationException,
     error_response,
@@ -123,7 +125,11 @@ async def not_found_exception_handler(request: Request, exc: NotFoundException):
     )
     return JSONResponse(
         status_code=status.HTTP_404_NOT_FOUND,
-        content=error_response(exc.message, status.HTTP_404_NOT_FOUND),
+        content=error_response(
+            code=exc.error_code,
+            message=exc.message,
+            details=exc.details,
+        ),
     )
 
 
@@ -137,7 +143,11 @@ async def bad_request_exception_handler(request: Request, exc: BadRequestExcepti
     )
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
-        content=error_response(exc.message, status.HTTP_400_BAD_REQUEST),
+        content=error_response(
+            code=exc.error_code,
+            message=exc.message,
+            details=exc.details,
+        ),
     )
 
 
@@ -151,7 +161,11 @@ async def unauthorized_exception_handler(request: Request, exc: UnauthorizedExce
     )
     return JSONResponse(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        content=error_response(exc.message, status.HTTP_401_UNAUTHORIZED),
+        content=error_response(
+            code=exc.error_code,
+            message=exc.message,
+            details=exc.details,
+        ),
     )
 
 
@@ -165,7 +179,11 @@ async def forbidden_exception_handler(request: Request, exc: ForbiddenException)
     )
     return JSONResponse(
         status_code=status.HTTP_403_FORBIDDEN,
-        content=error_response(exc.message, status.HTTP_403_FORBIDDEN),
+        content=error_response(
+            code=exc.error_code,
+            message=exc.message,
+            details=exc.details,
+        ),
     )
 
 
@@ -179,7 +197,11 @@ async def conflict_exception_handler(request: Request, exc: ConflictException):
     )
     return JSONResponse(
         status_code=status.HTTP_409_CONFLICT,
-        content=error_response(exc.message, status.HTTP_409_CONFLICT),
+        content=error_response(
+            code=exc.error_code,
+            message=exc.message,
+            details=exc.details,
+        ),
     )
 
 
@@ -190,14 +212,54 @@ async def validation_exception_handler(request: Request, exc: ValidationExceptio
         "validation_error",
         path=request.url.path,
         message=exc.message,
-        errors=exc.errors,
+        details=exc.details,
     )
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content=error_response(
+            code=exc.error_code,
             message=exc.message,
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            errors=exc.errors,
+            details=exc.details,
+        ),
+    )
+
+
+@app.exception_handler(ServiceUnavailableException)
+async def service_unavailable_exception_handler(
+    request: Request, exc: ServiceUnavailableException
+):
+    """Handle service unavailable exceptions."""
+    logger.warning(
+        "service_unavailable",
+        path=request.url.path,
+        message=exc.message,
+    )
+    return JSONResponse(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        content=error_response(
+            code=exc.error_code,
+            message=exc.message,
+            details=exc.details,
+        ),
+    )
+
+
+@app.exception_handler(AppException)
+async def app_exception_handler(request: Request, exc: AppException):
+    """Fallback handler for all custom app exceptions."""
+    logger.warning(
+        "app_exception",
+        path=request.url.path,
+        error_code=exc.error_code,
+        message=exc.message,
+        status_code=exc.status_code,
+    )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=error_response(
+            code=exc.error_code,
+            message=exc.message,
+            details=exc.details,
         ),
     )
 
@@ -226,9 +288,9 @@ async def request_validation_exception_handler(
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content=error_response(
+            code="VALIDATION_ERROR",
             message="Validation error",
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            errors=errors,
+            details={"errors": errors},
         ),
     )
 

@@ -56,12 +56,12 @@ export default function StoryBooksPage() {
         {/* Search + Sort + Mobile filter trigger */}
         <div className="flex gap-3 mb-6 md:mb-8">
           <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4 pointer-events-none" />
+            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-muted-foreground h-10 w-4 pointer-events-none" />
             <Input
               placeholder="Search by title, genre, theme…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 h-11 rounded-2xl bg-background border-border/60 shadow-sm focus-visible:ring-pink-400/50 text-sm"
+              className="pl-12 h-11 rounded-2xl bg-background border-border/60 shadow-sm focus-visible:ring-pink-400/50 text-sm"
             />
           </div>
 

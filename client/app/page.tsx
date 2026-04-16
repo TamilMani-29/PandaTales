@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Sparkles, Palette, Heart, Star, BookOpen } from 'lucide-react';
+import { Sparkles, Palette, Heart, Star, BookOpen, Smartphone } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Footer } from '@/components/layout/footer';
 
@@ -43,6 +43,12 @@ export default function HomePage() {
               Create magical personalised books featuring your child as the star of their own adventure — choose to colour or to read
             </p>
             <div className="flex gap-4 justify-center flex-wrap">
+              <Link href="/digital-books">
+                <Button size="lg" className="text-lg px-8 py-6 rounded-2xl shadow-lg hover:shadow-xl transition-all bg-[#1E40AF] hover:bg-[#1D4ED8]">
+                  <Smartphone className="mr-2 h-5 w-5" />
+                  Digital Book @ ₹99
+                </Button>
+              </Link>
               <Link href="/coloring-books">
                 <Button size="lg" className="text-lg px-8 py-6 rounded-2xl shadow-lg hover:shadow-xl transition-all bg-[#6B21A8] hover:bg-[#581C87]">
                   <Palette className="mr-2 h-5 w-5" />
@@ -66,8 +72,26 @@ export default function HomePage() {
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
             viewport={{ once: true }}
-            className="grid md:grid-cols-2 gap-8"
+            className="grid md:grid-cols-3 gap-8"
           >
+            {/* Digital Books */}
+            <Card className="border-2 border-blue-200 shadow-lg hover:shadow-xl transition-all rounded-3xl overflow-hidden group">
+              <CardContent className="p-8">
+                <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center mb-5">
+                  <Smartphone className="h-7 w-7 text-[#1E40AF]" />
+                </div>
+                <h3 className="text-2xl font-bold mb-2">Digital Book @ ₹99</h3>
+                <p className="text-muted-foreground mb-5">
+                  Pay ₹99 and get a personalized story + drawing book in different genres and styles.
+                </p>
+                <Link href="/digital-books">
+                  <Button variant="outline" className="rounded-xl border-[#1E40AF] text-[#1E40AF] hover:bg-blue-50">
+                    Explore Digital Books
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+
             {/* Coloring Books */}
             <Card className="border-2 border-purple-200 shadow-lg hover:shadow-xl transition-all rounded-3xl overflow-hidden group">
               <CardContent className="p-8">
@@ -167,6 +191,12 @@ export default function HomePage() {
               Start creating personalised books that your child will treasure forever
             </p>
             <div className="flex gap-4 justify-center flex-wrap">
+              <Link href="/digital-books">
+                <Button size="lg" className="text-lg px-8 py-6 rounded-2xl bg-[#1E40AF] hover:bg-[#1D4ED8]">
+                  <Smartphone className="mr-2 h-5 w-5" />
+                  Digital Book @ ₹99
+                </Button>
+              </Link>
               <Link href="/coloring-books">
                 <Button size="lg" className="text-lg px-8 py-6 rounded-2xl bg-[#6B21A8] hover:bg-[#581C87]">
                   <Palette className="mr-2 h-5 w-5" />

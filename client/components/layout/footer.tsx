@@ -6,6 +6,7 @@ const SECTIONS = [
   {
     heading: 'Books',
     links: [
+      { label: 'Digital Book @ ₹99', href: '/digital-books' },
       { label: 'Coloring Books', href: '/coloring-books' },
       { label: 'Story Books', href: '/story-books' },
     ],

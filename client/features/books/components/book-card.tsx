@@ -30,8 +30,9 @@ export function BookCard({ book, type }: BookCardProps) {
             src={book.coverImage}
             alt={book.title}
             fill
-            className="object-cover"
+            className="object-contain bg-slate-50 p-1"
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            quality={70}
           />
           <div className="absolute top-2 right-2 md:top-3 md:right-3 flex gap-1.5 md:gap-2">
             <Badge className="bg-white/90 text-foreground text-xs px-1.5 py-0.5 md:px-2 md:py-1">

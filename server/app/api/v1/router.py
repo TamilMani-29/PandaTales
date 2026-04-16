@@ -7,6 +7,7 @@ from app.api.v1.endpoints import (
     checkout,
     children,
     coloring_books,
+    digital_books,
     generated_books,
     generation_configs,
     story_books,
@@ -18,6 +19,7 @@ api_router = APIRouter(prefix="/v1")
 # Include routers
 api_router.include_router(story_books.router)
 api_router.include_router(coloring_books.router)
+api_router.include_router(digital_books.router)
 api_router.include_router(generated_books.router)
 api_router.include_router(checkout.router)
 api_router.include_router(generation_configs.public_router)  # Public themes endpoint
