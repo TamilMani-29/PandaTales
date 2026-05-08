@@ -2,8 +2,9 @@
 
 import asyncio
 import io
+import re
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import (
     APIRouter,
@@ -37,10 +38,41 @@ logger = get_logger(__name__)
 router = APIRouter(tags=["Book Generation"])
 
 
-# TODO: Replace with real JWT auth dependency
 def get_current_user_id() -> UUID:
-    """Temporary function to get current user ID - replace with actual auth"""
+    """Stub auth — replace with real JWT dependency when auth is wired up."""
     return UUID("00000000-0000-0000-0000-000000000001")
+
+
+async def _get_or_create_guest_user(db: AsyncSession, email: str) -> UUID:
+    """Look up a user by email, or create a minimal guest account if not found.
+
+    This lets public (unauthenticated) personalized-order submissions be stored
+    with a valid user_id foreign key.
+    """
+    import secrets
+    from app.models.user import User
+    from sqlalchemy import select as _select
+
+    result = await db.execute(_select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if user:
+        return user.id
+
+    # Generate a short unique referral code
+    referral_code = secrets.token_urlsafe(10)[:12].upper()
+
+    guest = User(
+        email=email,
+        password_hash=None,
+        first_name="Guest",
+        last_name="",
+        full_name="Guest",
+        referral_code=referral_code,
+        referral_count=0,
+    )
+    db.add(guest)
+    await db.flush()  # assigns guest.id without committing outer txn
+    return guest.id
 
 
 # Helper function to handle photo uploads with MinIO storage
@@ -79,6 +111,39 @@ async def process_photo_uploads(
             )
     
     return photo_urls
+
+
+async def process_personalized_uploads(
+    photos: list[UploadFile],
+    storage_service: StorageService,
+    child_name: str | None,
+    max_size_mb: int = 10,
+) -> tuple[list[str], str]:
+    """Upload photos to personalized/{child_name}_{folder_id}/ and return (object_names, folder).
+
+    Uses a stable folder per submission so admin can browse organized folders in MinIO.
+    """
+    safe_name = re.sub(r"[^a-z0-9]+", "_", (child_name or "child").lower()).strip("_")[:30]
+    folder_id = str(uuid4()).replace("-", "")[:12]
+    folder = f"personalized/{safe_name}_{folder_id}"
+
+    photo_object_names: list[str] = []
+    for idx, photo in enumerate(photos):
+        try:
+            object_name = await storage_service.upload_personalized_photo(
+                file=photo,
+                folder=folder,
+                index=idx,
+                max_size_mb=max_size_mb,
+            )
+            photo_object_names.append(object_name)
+        except Exception as e:
+            from app.common.exceptions import BadRequestException as _BE, ServiceUnavailableException as _SE
+            if isinstance(e, _BE):
+                raise _BE(message=f"Photo {idx + 1} error: {e.message}")  # type: ignore[attr-defined]
+            raise _SE(message=f"Failed to upload photo {idx + 1}. Please try again.")
+
+    return photo_object_names, folder
 
 
 @router.post(
@@ -149,15 +214,18 @@ async def generate_photo_to_coloring_book(
     child_gender: str | None = Form(None, description="Child gender (required if no child_id)"),
     parent_email: str = Form(..., description="Parent email required for delivery and notifications"),
     whatsapp_number: str | None = Form(None, description="WhatsApp number for order updates (required for printed copies)"),
+    selected_theme_name: str | None = Form(None, description="Selected theme name from personalized flow (e.g. Adventure, Princess)"),
     line_weight: str = Form("medium", description="Line weight: thin, medium, thick"),
     detail_level: str = Form("medium", description="Detail level: low, medium, high"),
     simplification_level: str = Form("moderate", description="Simplification: minimal, moderate, high"),
     photos: list[UploadFile] = File(..., description="1-10 photos, max 10MB each"),
     db: AsyncSession = Depends(get_db),
-    user_id: UUID = Depends(get_current_user_id),
 ) -> dict[str, Any]:
     """Generate coloring book by converting photos directly to line art"""
-    
+
+    # Resolve user_id from parent_email (look up or create a guest account)
+    user_id = await _get_or_create_guest_user(db, parent_email)
+
     # Validate photos (1-10)
     if not photos or len(photos) < 1:
         raise BadRequestException("At least 1 photo is required")
@@ -165,9 +233,9 @@ async def generate_photo_to_coloring_book(
     if len(photos) > 10:
         raise BadRequestException("Maximum 10 photos allowed for photo-to-coloring")
     
-    # Process photo uploads with proper error handling
+    # Upload photos to personalized/{child_name}_{folder_id}/ for organized MinIO storage
     storage_service = StorageService()
-    photo_urls = await process_photo_uploads(photos, storage_service)
+    photo_urls, _folder = await process_personalized_uploads(photos, storage_service, child_name)
     
     # Create generation request
     generation_data = PhotoToColoringGenerationCreate(
@@ -177,6 +245,7 @@ async def generate_photo_to_coloring_book(
         child_gender=child_gender,  # type: ignore
         parent_email=parent_email,
         whatsapp_number=whatsapp_number,
+        selected_theme_name=selected_theme_name,
         line_weight=line_weight,  # type: ignore
         detail_level=detail_level,  # type: ignore
         simplification_level=simplification_level,  # type: ignore

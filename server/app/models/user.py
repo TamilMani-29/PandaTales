@@ -9,7 +9,6 @@ from sqlalchemy import (
     Index,
     String,
 )
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import DateTime
 
@@ -43,10 +42,13 @@ class User(Base, BaseModel, SoftDeleteMixin):
     )
 
     # Profile Information
+    full_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
     phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
     avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    referral_code: Mapped[str] = mapped_column(String(20), nullable=False, unique=True, index=True)
+    referral_count: Mapped[int] = mapped_column(default=0, nullable=False)
 
     # Verification Status
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

@@ -1,5 +1,6 @@
 """User Repository - Data Access Layer"""
 
+import secrets
 from uuid import UUID
 
 from sqlalchemy import select
@@ -45,6 +46,15 @@ class UserRepository:
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
+    async def get_by_referral_code(self, referral_code: str) -> User | None:
+        """Get active user by referral code."""
+        query = select(User).where(
+            User.referral_code == referral_code,
+            User.is_active == True,
+        )
+        result = await self.db.execute(query)
+        return result.scalar_one_or_none()
+
     async def get_by_oauth(
         self, provider: str, provider_id: str, include_inactive: bool = False
     ) -> User | None:
@@ -67,7 +77,34 @@ class UserRepository:
             password_hash=password_hash,
             first_name=user_data.first_name,
             last_name=user_data.last_name,
+            full_name=f"{user_data.first_name} {user_data.last_name}".strip(),
             phone=user_data.phone,
+            referral_code=await self._generate_referral_code(),
+            referral_count=0,
+        )
+        self.db.add(user)
+        await self.db.commit()
+        await self.db.refresh(user)
+        return user
+
+    async def create_from_signup(
+        self,
+        *,
+        email: str,
+        password_hash: str,
+        first_name: str,
+        last_name: str,
+        full_name: str,
+    ) -> User:
+        """Create a user for email/password signup."""
+        user = User(
+            email=email,
+            password_hash=password_hash,
+            first_name=first_name,
+            last_name=last_name,
+            full_name=full_name,
+            referral_code=await self._generate_referral_code(),
+            referral_count=0,
         )
         self.db.add(user)
         await self.db.commit()
@@ -124,3 +161,13 @@ class UserRepository:
         user = await self.get_by_id(user_id)
         user.last_login_at = datetime.now()
         await self.db.commit()
+
+    async def _generate_referral_code(self) -> str:
+        """Generate a unique referral code for a user."""
+        for _ in range(8):
+            candidate = f"PP{secrets.token_hex(3).upper()}"
+            query = select(User).where(User.referral_code == candidate)
+            result = await self.db.execute(query)
+            if result.scalar_one_or_none() is None:
+                return candidate
+        return f"PP{secrets.token_hex(4).upper()}"

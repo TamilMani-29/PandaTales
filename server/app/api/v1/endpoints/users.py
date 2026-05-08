@@ -1,14 +1,14 @@
 """User Profile API Routes"""
 
 from typing import Any
-from uuid import UUID
-
 from fastapi import APIRouter, Depends, File, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common import get_logger, success_response
 from app.common.exceptions import BadRequestException, ServiceUnavailableException
+from app.core.security import get_current_user
 from app.db.session import get_db
+from app.models.user import User
 from app.schemas.user import (
     AccountDeletionRequest,
     AvatarUploadResponse,
@@ -23,15 +23,6 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/users", tags=["User Management"])
 
 
-# TODO: Add authentication dependency
-# For now, we'll use a hardcoded user_id for demonstration
-# In production, this should be: Depends(get_current_user)
-def get_current_user_id() -> UUID:
-    """Temporary function to get current user ID - replace with actual auth"""
-    # This should be replaced with actual authentication
-    return UUID("00000000-0000-0000-0000-000000000001")
-
-
 @router.get(
     "/profile",
     response_model=dict[str, Any],
@@ -40,12 +31,12 @@ def get_current_user_id() -> UUID:
     description="Get authenticated user's profile information",
 )
 async def get_user_profile(
-    user_id: UUID = Depends(get_current_user_id),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Get user profile"""
     service = UserService(db)
-    user = await service.get_user_profile(user_id)
+    user = await service.get_user_profile(current_user.id)
 
     response_data = UserProfileResponse.model_validate(user)
 
@@ -64,12 +55,12 @@ async def get_user_profile(
 )
 async def update_user_profile(
     profile_data: UserUpdate,
-    user_id: UUID = Depends(get_current_user_id),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Update user profile"""
     service = UserService(db)
-    user = await service.update_user_profile(user_id, profile_data)
+    user = await service.update_user_profile(current_user.id, profile_data)
 
     response_data = UserProfileResponse.model_validate(user)
 
@@ -88,7 +79,7 @@ async def update_user_profile(
 )
 async def upload_avatar(
     file: UploadFile = File(..., description="Avatar image file"),
-    user_id: UUID = Depends(get_current_user_id),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Upload user avatar to MinIO with proper error handling"""
@@ -110,7 +101,7 @@ async def upload_avatar(
         
         # Update user's avatar in database
         service = UserService(db)
-        await service.update_avatar(user_id, object_name)
+        await service.update_avatar(current_user.id, object_name)
         
         response_data = AvatarUploadResponse(avatar_url=avatar_url)
         
@@ -120,7 +111,7 @@ async def upload_avatar(
         )
         
     except BadRequestException as e:
-        logger.warning(f"Avatar upload validation failed for user {user_id}: {e.message}")
+        logger.warning(f"Avatar upload validation failed for user {current_user.id}: {e.message}")
         return success_response(
             data=None,
             message=e.message,
@@ -128,7 +119,7 @@ async def upload_avatar(
         )
         
     except ServiceUnavailableException as e:
-        logger.error(f"Avatar upload failed for user {user_id}: {e.message}")
+        logger.error(f"Avatar upload failed for user {current_user.id}: {e.message}")
         return success_response(
             data=None,
             message="Failed to upload avatar. Please try again.",
@@ -136,7 +127,7 @@ async def upload_avatar(
         )
         
     except Exception as e:
-        logger.error(f"Unexpected error during avatar upload for user {user_id}: {e}", exc_info=True)
+        logger.error(f"Unexpected error during avatar upload for user {current_user.id}: {e}", exc_info=True)
         return success_response(
             data=None,
             message="An unexpected error occurred. Please try again.",
@@ -153,13 +144,13 @@ async def upload_avatar(
 )
 async def delete_account(
     deletion_request: AccountDeletionRequest,
-    user_id: UUID = Depends(get_current_user_id),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Delete user account"""
     service = UserService(db)
     await service.delete_account(
-        user_id,
+        current_user.id,
         deletion_request.password,
         deletion_request.confirmation,
     )

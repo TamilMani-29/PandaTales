@@ -6,9 +6,14 @@ from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common import success_response
-from app.core.constants import AgeGroup, BookType, Language, Style, Theme
 from app.db.session import get_db
-from app.schemas.digital_book import DigitalBookCreateRequest, SendPdfEmailRequest
+from app.schemas.digital_book import (
+    BookAttributeOptionCreateRequest,
+    BookCategoryCreateRequest,
+    DigitalBookCreateRequest,
+    DigitalBookUpdateRequest,
+    SendPdfEmailRequest,
+)
 from app.services.digital_book import DigitalBookService
 
 router = APIRouter(prefix="/digital-books", tags=["Digital Books"])
@@ -19,39 +24,61 @@ router = APIRouter(prefix="/digital-books", tags=["Digital Books"])
     response_model=dict[str, Any],
     status_code=status.HTTP_201_CREATED,
     summary="Create a digital book",
-    description="Create digital book metadata, upload cover/PDF to MinIO, and save URLs in DB.",
+    description="Create digital book metadata, upload cover/front/back images and PDF to MinIO, and save URLs in DB.",
 )
 async def create_digital_book(
     book_name: str = Form(..., min_length=1, max_length=255),
     description: str | None = Form(None),
+    book_tag: str | None = Form(None, max_length=80),
+    book_tags: str | None = Form(None, description="Comma-separated tags (e.g. bestseller, personalised, customized)"),
+    category_id: int | None = Form(None, ge=1),
+    emoji: str | None = Form(None, max_length=16),
     total_pages: int | None = Form(None, ge=1),
-    book_type: BookType = Form(...),
-    theme: Theme = Form(...),
-    style: Style = Form(...),
-    age_group: AgeGroup = Form(...),
-    language: Language = Form(Language.ENGLISH),
+    book_type: str = Form(..., min_length=1, max_length=50),
+    theme: str = Form(..., min_length=1, max_length=50),
+    language: str = Form("english", min_length=1, max_length=50),
     genre: str = Form(..., min_length=1, max_length=100),
     price: float | None = Form(None, ge=0),
+    rating: float | None = Form(None, ge=0, le=5),
+    total_ratings: int | None = Form(None, ge=0),
+    download_count: int | None = Form(None, ge=0),
+    is_bestseller: bool = Form(False),
+    is_personalized: bool = Form(False),
     cover_image: UploadFile = File(...),
-    book_file: UploadFile = File(...),
+    front_image: UploadFile | None = File(None),
+    back_image: UploadFile | None = File(None),
+    book_file: UploadFile | None = File(None),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Create a new digital book entry and upload assets."""
     payload = DigitalBookCreateRequest(
         book_name=book_name,
         description=description,
+        book_tag=book_tag,
+        book_tags=[item.strip() for item in (book_tags or "").split(",") if item.strip()] or None,
+        category_id=category_id,
+        emoji=emoji,
         total_pages=total_pages,
         book_type=book_type,
         theme=theme,
-        style=style,
-        age_group=age_group,
         language=language,
         genre=genre,
         price=price,
+        rating=rating,
+        total_ratings=total_ratings,
+        download_count=download_count,
+        is_bestseller=is_bestseller,
+        is_personalized=is_personalized,
     )
 
     service = DigitalBookService(db)
-    book = await service.create_book(payload, cover_image=cover_image, book_file=book_file)
+    book = await service.create_book(
+        payload,
+        cover_image=cover_image,
+        front_image=front_image,
+        back_image=back_image,
+        book_file=book_file,
+    )
     created_data = await service.get_book(book.id)
 
     return success_response(
@@ -69,11 +96,11 @@ async def create_digital_book(
 )
 async def get_digital_books(
     search: str | None = Query(None, max_length=120),
-    book_type: BookType | None = Query(None),
+    book_type: str | None = Query(None, max_length=50),
     genre: str | None = Query(None, max_length=100),
-    style: Style | None = Query(None),
-    age_group: AgeGroup | None = Query(None),
-    language: Language | None = Query(None),
+    category_id: int | None = Query(None, ge=1, description="Filter by category id"),
+    is_bestseller: bool | None = Query(None, description="Filter bestsellers only"),
+    language: str | None = Query(None, max_length=50),
     min_price: float | None = Query(None, ge=0),
     max_price: float | None = Query(None, ge=0),
     limit: int = Query(60, ge=1, le=120),
@@ -87,8 +114,8 @@ async def get_digital_books(
         search=search,
         book_type=book_type,
         genre=genre,
-        style=style,
-        age_group=age_group,
+        category_id=category_id,
+        is_bestseller=is_bestseller,
         language=language,
         min_price=min_price,
         max_price=max_price,
@@ -96,6 +123,57 @@ async def get_digital_books(
         offset=offset,
     )
     return success_response(data=data, message="Digital books retrieved successfully")
+
+
+@router.get(
+    "/categories",
+    response_model=dict[str, Any],
+    status_code=status.HTTP_200_OK,
+    summary="Get digital book categories",
+    description="List category metadata (name, tag, description, emoji, color, gradient).",
+)
+async def get_digital_book_categories(
+    active_only: bool = Query(True, description="Return only active categories"),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """List category rows from book_categories table."""
+    service = DigitalBookService(db)
+    data = await service.list_categories(active_only=active_only)
+    return success_response(data=data, message="Digital book categories retrieved successfully")
+
+
+@router.post(
+    "/categories",
+    response_model=dict[str, Any],
+    status_code=status.HTTP_201_CREATED,
+    summary="Create or update category metadata",
+    description="Upsert category metadata by category_id in book_categories table.",
+)
+async def create_or_update_digital_book_category(
+    payload: BookCategoryCreateRequest,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Create or update one category row."""
+    service = DigitalBookService(db)
+    data = await service.create_or_update_category(payload)
+    return success_response(data=data, message="Digital book category saved successfully")
+
+
+@router.delete(
+    "/categories/{category_id}",
+    response_model=dict[str, Any],
+    status_code=status.HTTP_200_OK,
+    summary="Delete a book category",
+    description="Delete a book_categories row by category_id.",
+)
+async def delete_digital_book_category(
+    category_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Delete one category by category_id."""
+    service = DigitalBookService(db)
+    data = await service.delete_category(category_id)
+    return success_response(data=data, message="Digital book category deleted successfully")
 
 
 @router.get(
@@ -113,7 +191,90 @@ async def get_digital_book_filter_options(db: AsyncSession = Depends(get_db)) ->
 
 
 @router.get(
-    "/{book_id}",
+    "/attribute-options",
+    response_model=dict[str, Any],
+    status_code=status.HTTP_200_OK,
+    summary="Get configurable book attribute options",
+    description="Return admin-managed option lists for book_type, theme, language, and genre.",
+)
+async def get_digital_book_attribute_options(db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
+    service = DigitalBookService(db)
+    data = await service.list_attribute_options()
+    return success_response(data=data, message="Digital book attribute options retrieved successfully")
+
+
+@router.post(
+    "/attribute-options",
+    response_model=dict[str, Any],
+    status_code=status.HTTP_201_CREATED,
+    summary="Create configurable book attribute option",
+    description="Create an option for one of: book_type, theme, language, genre.",
+)
+async def create_digital_book_attribute_option(
+    payload: BookAttributeOptionCreateRequest,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    service = DigitalBookService(db)
+    data = await service.create_attribute_option(payload.option_type, payload.value)
+    return success_response(data=data, message="Digital book attribute option saved successfully")
+
+
+@router.delete(
+    "/attribute-options/{option_type}/{value}",
+    response_model=dict[str, Any],
+    status_code=status.HTTP_200_OK,
+    summary="Delete configurable book attribute option",
+    description="Delete an option for one of: book_type, theme, language, genre.",
+)
+async def delete_digital_book_attribute_option(
+    option_type: str,
+    value: str,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    service = DigitalBookService(db)
+    data = await service.delete_attribute_option(option_type, value)
+    return success_response(data=data, message="Digital book attribute option deleted successfully")
+
+
+@router.get(
+    "/category/{category_id}",
+    response_model=dict[str, Any],
+    status_code=status.HTTP_200_OK,
+    summary="Get digital books by category",
+    description="Return digital books belonging to a specific category (path param). Supports all the same optional filters as the main list endpoint.",
+)
+async def get_digital_books_by_collection(
+    category_id: int,
+    search: str | None = Query(None, max_length=120),
+    book_type: str | None = Query(None, max_length=50),
+    genre: str | None = Query(None, max_length=100),
+    is_bestseller: bool | None = Query(None),
+    language: str | None = Query(None, max_length=50),
+    min_price: float | None = Query(None, ge=0),
+    max_price: float | None = Query(None, ge=0),
+    limit: int = Query(60, ge=1, le=120),
+    offset: int = Query(0, ge=0),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Get digital books filtered by category_id (path param)."""
+    service = DigitalBookService(db)
+    data = await service.list_books(
+        search=search,
+        book_type=book_type,
+        genre=genre,
+        category_id=category_id,
+        is_bestseller=is_bestseller,
+        language=language,
+        min_price=min_price,
+        max_price=max_price,
+        limit=limit,
+        offset=offset,
+    )
+    return success_response(data=data, message="Digital books retrieved successfully")
+
+
+@router.get(
+    "/{book_id:int}",
     response_model=dict[str, Any],
     status_code=status.HTTP_200_OK,
     summary="Get digital book details",
@@ -124,6 +285,73 @@ async def get_digital_book_by_id(book_id: int, db: AsyncSession = Depends(get_db
     service = DigitalBookService(db)
     data = await service.get_book(book_id)
     return success_response(data=data, message="Digital book retrieved successfully")
+
+
+@router.patch(
+    "/{book_id:int}",
+    response_model=dict[str, Any],
+    status_code=status.HTTP_200_OK,
+    summary="Update digital book",
+    description="Partially update digital book metadata (category, bestseller tag, price, etc.). File assets are not changed here.",
+)
+async def update_digital_book(
+    book_id: int,
+    payload: DigitalBookUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Update digital book metadata fields."""
+    service = DigitalBookService(db)
+    data = await service.update_book(book_id, payload)
+    return success_response(data=data, message="Digital book updated successfully")
+
+
+@router.delete(
+    "/{book_id:int}",
+    response_model=dict[str, Any],
+    status_code=status.HTTP_200_OK,
+    summary="Delete a digital book",
+    description="Delete a digital book record by ID. MinIO assets (images/PDF) are not removed.",
+)
+async def delete_digital_book(
+    book_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Delete one digital book by ID."""
+    service = DigitalBookService(db)
+    data = await service.delete_book(book_id)
+    return success_response(data=data, message="Digital book deleted successfully")
+
+
+@router.post(
+    "/{book_id:int}/category/{category_id}",
+    response_model=dict[str, Any],
+    status_code=status.HTTP_200_OK,
+    summary="Add/Set book category",
+    description="Assign a category to an existing digital book. Pass the numeric category_id as a path param (e.g. 1).",
+)
+async def add_digital_book_category(
+    book_id: int,
+    category_id: int,
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Set or update category for a book."""
+    service = DigitalBookService(db)
+    data = await service.add_book_category(book_id=book_id, category_id=category_id)
+    return success_response(data=data, message="Digital book category added successfully")
+
+
+@router.get(
+    "/{book_id:int}/preview-pdf",
+    response_model=dict[str, Any],
+    status_code=status.HTTP_200_OK,
+    summary="Get watermarked preview PDF URL",
+    description="Generate a temporary watermarked PDF preview URL for a digital book.",
+)
+async def get_digital_book_preview_pdf(book_id: int, db: AsyncSession = Depends(get_db)) -> dict[str, Any]:
+    """Create a watermarked preview and return a presigned URL."""
+    service = DigitalBookService(db)
+    data = await service.get_watermarked_preview(book_id)
+    return success_response(data=data, message="Digital book preview generated successfully")
 
 
 @router.post(
@@ -145,3 +373,5 @@ async def send_book_pdf_to_email(
         data={"book_id": request.book_id, "email": str(request.email)},
         message="Successfully email sent",
     )
+
+

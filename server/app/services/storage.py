@@ -222,10 +222,47 @@ class StorageService:
                 message="Image upload failed"
             )
 
+    async def upload_personalized_photo(
+        self,
+        file: "UploadFile",
+        folder: str,
+        index: int,
+        max_size_mb: int = 10,
+    ) -> str:
+        """
+        Upload a personalized order photo to a dedicated folder in MinIO.
+        
+        Object path: {folder}/photo_{index+1}{ext}
+        e.g. personalized/arjun_abc123/photo_1.jpg
+
+        Returns the object name stored in the DB.
+        """
+        from pathlib import Path as _Path
+        from uuid import uuid4 as _uuid4
+
+        if not file.content_type or not file.content_type.startswith("image/"):
+            raise BadRequestException(
+                message=f"Invalid file type for photo {index + 1}. Expected image, got: {file.content_type}"
+            )
+
+        file_ext = _Path(file.filename or "").suffix.lower()
+        if file_ext not in {".jpg", ".jpeg", ".png", ".webp"}:
+            file_ext = ".jpg"  # fallback for missing extension
+
+        object_name = f"{folder}/photo_{index + 1}{file_ext}"
+        return await self.upload_file(
+            file=file,
+            object_name=object_name,
+            content_type=file.content_type,
+            max_size_mb=max_size_mb,
+        )
+
     async def get_file_url(
         self,
         object_name: str,
         expires: timedelta = timedelta(hours=1),
+        check_exists: bool = True,
+        stat_timeout_seconds: float = 2.0,
     ) -> str:
         """
         Generate presigned URL for file access
@@ -233,6 +270,8 @@ class StorageService:
         Args:
             object_name: Path/name in bucket
             expires: URL expiration time
+            check_exists: Whether to verify object existence before signing URL
+            stat_timeout_seconds: Timeout for object existence check when enabled
             
         Returns:
             str: Presigned URL
@@ -242,15 +281,29 @@ class StorageService:
             ServiceUnavailableException: Failed to generate URL
         """
         try:
-            # Check if object exists
-            try:
-                await asyncio.to_thread(self.client.stat_object, self.bucket, object_name)
-            except S3Error as e:
-                if e.code == "NoSuchKey":
-                    raise NotFoundException(
-                        message=f"File not found: {object_name}"
+            # Optionally check object existence. For list views we can skip this to avoid
+            # slow retries when MinIO is temporarily unavailable.
+            if check_exists:
+                try:
+                    await asyncio.wait_for(
+                        asyncio.to_thread(self.client.stat_object, self.bucket, object_name),
+                        timeout=stat_timeout_seconds,
                     )
-                raise
+                except S3Error as e:
+                    if e.code == "NoSuchKey":
+                        raise NotFoundException(
+                            message=f"File not found: {object_name}"
+                        )
+                    raise
+                except asyncio.TimeoutError as exc:
+                    logger.warning(
+                        "minio_stat_timeout",
+                        object_name=object_name,
+                        timeout_seconds=stat_timeout_seconds,
+                    )
+                    raise ServiceUnavailableException(
+                        message="Storage service is temporarily unavailable"
+                    ) from exc
             
             # Generate presigned URL — run blocking SDK call off the event loop
             url = await asyncio.to_thread(

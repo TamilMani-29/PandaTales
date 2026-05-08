@@ -120,6 +120,9 @@ class GeneratedBook(Base, BaseModel):
         Boolean, nullable=False, default=False, index=True
     )
     purchased_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    payment_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="pending", server_default="pending"
+    )
 
     # Timing
     generation_duration: Mapped[int | None] = mapped_column(

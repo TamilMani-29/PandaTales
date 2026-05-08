@@ -1,7 +1,9 @@
 """Generated Book Service"""
 
 import asyncio
+import smtplib
 from datetime import datetime
+from email.message import EmailMessage
 from typing import Sequence
 from uuid import UUID
 
@@ -10,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.common.exceptions import ForbiddenException, NotFoundException
 from app.common.logging import get_logger
 from app.common.pagination import PaginationParams
+from app.core.config import settings
 from app.models.coloring_book_template import ColoringBookTemplate
 from app.models.generated_book import GeneratedBook
 from app.models.story_book_template import StoryBookTemplate
@@ -148,6 +151,7 @@ class GeneratedBookService:
             photos=photos,
             parent_email=data.parent_email,
             whatsapp_number=data.whatsapp_number,
+            selected_theme_name=data.selected_theme_name,
             generation_steps={
                 "photo_processing": "pending",
                 "line_extraction": "pending",
@@ -158,6 +162,20 @@ class GeneratedBookService:
 
         book = await self.repository.create(book)
         await self.db.commit()
+
+        try:
+            await self._send_personalized_started_email(
+                parent_email=data.parent_email,
+                child_name=child_name,
+                selected_theme_name=data.selected_theme_name,
+            )
+        except Exception as exc:
+            logger.warning(
+                "personalized_start_email_failed",
+                generation_id=str(book.id),
+                parent_email=data.parent_email,
+                error=str(exc),
+            )
 
         # Start mock generation in background (replace with actual AI generation later)
         await start_mock_generation(book.id, self.db)
@@ -614,3 +632,70 @@ class GeneratedBookService:
         )
 
         return await self.initiate_generation(user_id, data, old_book.photos)
+
+    async def _send_personalized_started_email(
+        self,
+        *,
+        parent_email: str,
+        child_name: str,
+        selected_theme_name: str | None,
+    ) -> None:
+        if not settings.SMTP_HOST or not settings.SMTP_PORT:
+            return
+        if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
+            return
+
+        parent_name = self._guess_parent_name(parent_email)
+
+        message = EmailMessage()
+        message["Subject"] = "✨ Your book is ready! Download now | Pandora Pages"
+        message["From"] = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_FROM_EMAIL}>"
+        message["To"] = parent_email
+        message.set_content(
+            f"Hi {parent_name} 👋\n\n"
+            "You just made a child's day - maybe even their whole week.\n\n"
+            "Your book is ready right now. No waiting. No shipping. Just pure magic.\n\n"
+            "⬇️ Download Your Book Now\n"
+            "(Attached as PDF in this email)\n\n"
+            '"Every page read tonight plants a seed - for curiosity, courage, and a lifelong love of learning." 🌱\n\n'
+            "- Team PandoraPages\n\n"
+            "✨ Make it extra special\n\n"
+            "🖨️ Print and bind it\n"
+            "Turn this into a real book.\n"
+            "Any nearby print shop can spiral-bind it for just INR 100-INR 150.\n\n"
+            "📸 Capture the moment\n"
+            "Seeing a child connect with their own story is priceless.\n"
+            "Tag us on Instagram: @PandoraPages.in\n\n"
+            "🎁 Share the joy\n"
+            "Know another parent who'd love this?\n"
+            "Forward this email - it might make their child's day too.\n\n"
+            "🎨 You might also love\n"
+            "- PersonaColor Book (now just INR 129)\n"
+            "- 21-Day SkillSprint (now just INR 99)\n"
+            "- LifePath Board Game (now just INR 149)\n\n"
+            "All available instantly - download and print at home.\n\n"
+            "🎁 Share and Earn\n"
+            "Share your code with 5 parents and get a FREE digital book.\n\n"
+            "📱 Join Our Parent Community\n"
+            "Free coloring pages, mini-stories and activity ideas every week.\n\n"
+            "We'd love to hear how it goes 💛\n\n"
+            "With love,\n"
+            "PandoraPages"
+        )
+
+        await asyncio.to_thread(self._send_email_sync, message)
+
+    @staticmethod
+    def _guess_parent_name(email: str) -> str:
+        local = (email or "").split("@", 1)[0].strip()
+        if not local:
+            return "Parent"
+        cleaned = local.replace(".", " ").replace("_", " ").replace("-", " ")
+        return " ".join(part.capitalize() for part in cleaned.split() if part) or "Parent"
+
+    @staticmethod
+    def _send_email_sync(message: EmailMessage) -> None:
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=30) as server:
+            server.starttls()
+            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+            server.send_message(message)

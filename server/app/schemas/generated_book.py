@@ -68,6 +68,9 @@ class PhotoToColoringGenerationCreate(BaseModel):
     parent_email: str = Field(..., pattern=r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", description="Parent email required for delivery and notifications")
     whatsapp_number: str | None = Field(None, max_length=20, description="WhatsApp number for order updates (required for printed copies)")
     
+    # Optional theme selection (e.g. from personalized flow)
+    selected_theme_name: str | None = Field(None, max_length=100)
+
     # Processing options
     line_weight: Literal["thin", "medium", "thick"] = "medium"
     detail_level: Literal["low", "medium", "high"] = "medium"

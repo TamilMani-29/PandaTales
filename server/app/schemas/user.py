@@ -39,7 +39,10 @@ class UserProfileResponse(UserBase):
     """Schema for user profile response"""
 
     id: UUID
+    full_name: Optional[str] = None
     avatar_url: Optional[str] = None
+    referral_code: str
+    referral_count: int
     email_verified: bool
     phone_verified: bool
     role: str
