@@ -1,10 +1,12 @@
-﻿import { useState, useEffect } from "react";
+﻿import { useState, useEffect, useRef } from "react";
 import {
+  buildApiUrl,
   clearToken,
   createDigitalPaymentOrder,
   getDigitalBookCategories,
   getCurrentUser,
   getDigitalBooks,
+  getToken,
   getDigitalBookPreview,
   initiatePersonalizedBookOrder,
   loginUser,
@@ -103,8 +105,6 @@ export default function App(){
   const [book,setBook]=useState(null);
   const [checkout,setCk]=useState(null);
   const [pModal,setPModal]=useState(null);
-  const [del,setDel]=useState("email");
-  const [contact,setContact]=useState("");
   const [done,setDone]=useState(false);
   const [checkoutError,setCheckoutError]=useState("");
   const [pForm,setPF]=useState({name:"",age:"",gender:"",phone:"",email:"",theme:"",photoFile:null});
@@ -121,12 +121,25 @@ export default function App(){
   const [collections,setCollections]=useState([]);
   const [authOpen,setAuthOpen]=useState(false);
   const [authMode,setAuthMode]=useState("signin");
-  const [authForm,setAuthForm]=useState({email:"",password:"",fullName:"",referralCode:""});
+  const [authForm,setAuthForm]=useState({email:"",password:"",fullName:"",phone:"",referralCode:""});
   const [authErr,setAuthErr]=useState("");
   const [authLoading,setAuthLoading]=useState(false);
   const [personalizeBook,setPersonalizeBook]=useState(null);
+  const didInitAuth=useRef(false);
+  const didLoadBooks=useRef(false);
+  const didLoadCategories=useRef(false);
 
   useEffect(()=>{
+    if(didInitAuth.current) return;
+    didInitAuth.current=true;
+
+    const token=getToken();
+    if(!token){
+      setUser(null);
+      setProfile(null);
+      return;
+    }
+
     (async()=>{
       try{
         const me=await getCurrentUser();
@@ -158,6 +171,9 @@ export default function App(){
   },[user]);
 
   useEffect(()=>{
+    if(didLoadBooks.current) return;
+    didLoadBooks.current=true;
+
     (async()=>{
       try{
         const books=await getDigitalBooks();
@@ -173,6 +189,9 @@ export default function App(){
   },[]);
 
   useEffect(()=>{
+    if(didLoadCategories.current) return;
+    didLoadCategories.current=true;
+
     (async()=>{
       try{
         const categories=await getDigitalBookCategories();
@@ -208,6 +227,7 @@ export default function App(){
           full_name:authForm.fullName,
           email:authForm.email,
           password:authForm.password,
+          phone:authForm.phone.trim(),
           referral_code: authForm.referralCode?.trim() || undefined,
         });
         setToken(data.access_token);
@@ -218,7 +238,7 @@ export default function App(){
         setUser(data.user);
       }
       setAuthOpen(false);
-      setAuthForm((f)=>({email:"",password:"",fullName:"",referralCode:f.referralCode||""}));
+      setAuthForm((f)=>({email:"",password:"",fullName:"",phone:"",referralCode:f.referralCode||""}));
     }catch(e){setAuthErr(e.message||"Authentication failed")}
     finally{setAuthLoading(false)}
   };
@@ -229,7 +249,18 @@ export default function App(){
   useEffect(()=>{window.scrollTo({top:0,behavior:"smooth"})},[pg,col]);
 
   const go=(p,c)=>{setPg(p);setCol(c||null)};
-  const resetCk=()=>{setCk(null);setDel("email");setContact("");setDone(false);setCheckoutError("")};
+  const resetCk=()=>{setCk(null);setDone(false);setCheckoutError("")};
+
+  const autoDownloadFromUrl=(downloadPath,delayMs=0)=>{
+    window.setTimeout(()=>{
+      const isAbsolute=/^https?:\/\//i.test(downloadPath||"");
+      const iframe=document.createElement("iframe");
+      iframe.style.display="none";
+      iframe.src=isAbsolute?downloadPath:buildApiUrl(downloadPath);
+      document.body.appendChild(iframe);
+      window.setTimeout(()=>iframe.remove(),20000);
+    },delayMs);
+  };
 
   const loadRazorpaySdk = () => new Promise((resolve, reject) => {
     if (window.Razorpay) {
@@ -246,19 +277,12 @@ export default function App(){
   const resetP=()=>{setPModal(null);setPF({name:"",age:"",gender:"",phone:"",email:"",theme:"",photoFile:null});setPStep(1);setPDone(false);setPSubmitting(false);setPError("")};
 
   const R="#4A1FB8",G="#FFB830",L="#A29BFE",D="#1A0A3E",C="#FFF9F0",W="#25D366";
-  const referrals = Number(profile?.referral_count || 0);
-  const progressToFive = Math.min(referrals,5);
-  const progressToTen = Math.min(referrals,10);
-  const hasFiveReward = referrals >= 5;
-  const hasTenReward = referrals >= 10;
-
   const Btn=({children,bg,c:cl,onClick,s})=><button onClick={onClick} style={{background:bg||`linear-gradient(135deg,${R},${L})`,color:cl||"#fff",border:"none",padding:"14px 32px",borderRadius:50,fontFamily:"'Baloo 2',cursive",fontSize:"1.05rem",fontWeight:700,cursor:"pointer",display:"inline-flex",alignItems:"center",gap:8,transition:"all .3s",boxShadow:"0 6px 20px rgba(0,0,0,.12)",...(s||{})}}>{children}</button>;
 
   const Nav=()=><nav style={{position:"fixed",top:0,left:0,right:0,zIndex:1000,display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 28px",background:scrolled?"rgba(255,255,255,.95)":"rgba(255,255,255,.85)",backdropFilter:"blur(20px)",borderBottom:`2px solid rgba(74,31,184,${scrolled?.1:.04})`,transition:"all .3s",boxShadow:scrolled?"0 4px 30px rgba(74,31,184,.1)":"none"}}>
     <div onClick={()=>go("home")} style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",fontFamily:"'Baloo 2',cursive",fontWeight:800,fontSize:"1.45rem",color:R}}><img src="/logo.png" alt="Pandora Pages" style={{height:"1.6em",width:"1.6em",objectFit:"contain",display:"block"}}/><span>Pandora<span style={{color:G}}>Pages</span></span></div>
     <div style={{display:"flex",gap:18,alignItems:"center"}}>
       {[["Products",()=>go("products")],["See the Magic",()=>{go("home");setTimeout(()=>document.getElementById("magic")?.scrollIntoView({behavior:"smooth"}),100)}],["Collections",()=>go("collections")]].map(([t,fn])=><span key={t} onClick={fn} style={{fontWeight:600,fontSize:".9rem",color:D,cursor:"pointer"}}>{t}</span>)}
-      <button onClick={()=>{go("home");setTimeout(()=>document.getElementById("refer")?.scrollIntoView({behavior:"smooth"}),120)}} style={{background:`linear-gradient(135deg,${G},#FFC947)`,border:"none",color:D,padding:"7px 16px",borderRadius:30,fontFamily:"'Baloo 2',cursive",fontWeight:800,fontSize:".82rem",cursor:"pointer",boxShadow:"0 4px 14px rgba(255,184,48,.4)",animation:"pulse 2.4s ease-in-out infinite",lineHeight:1.2,whiteSpace:"nowrap",display:"inline-flex",alignItems:"center",gap:6}}>🎁 Refer & Earn</button>
       <a href="https://chat.whatsapp.com/CMevldqAxQEAP0z40jTF5j" target="_blank" rel="noreferrer" style={{background:`linear-gradient(135deg,${W},#1FAF54)`,border:"none",color:"#fff",padding:"7px 16px",borderRadius:30,fontFamily:"'Baloo 2',cursive",fontWeight:800,fontSize:".82rem",cursor:"pointer",boxShadow:"0 4px 14px rgba(37,211,102,.4)",textDecoration:"none",display:"inline-flex",alignItems:"center",gap:6,lineHeight:1.2,whiteSpace:"nowrap",animation:"pulse 2.4s ease-in-out infinite"}}>💬 Join Community</a>
       {user?<>
         <span style={{fontWeight:600,fontSize:".85rem",color:R}}>👋 {profile?.full_name||user.email?.split("@")[0]}</span>
@@ -451,50 +475,6 @@ export default function App(){
       )}
       <div style={{textAlign:"center",marginTop:36}}>
         <Btn onClick={()=>go("collections")}>See All Collections →</Btn>
-      </div>
-    </section>
-
-    <section id="refer" style={{background:"linear-gradient(180deg,#1A0A3E,#150F2D)",padding:"80px 20px"}}>
-      <div style={{textAlign:"center",marginBottom:36}}>
-        <div style={{fontSize:44,marginBottom:10}}>🎁</div>
-        <h2 style={{fontFamily:"'Baloo 2',cursive",fontSize:"clamp(1.8rem,3vw,2.4rem)",color:"#fff",marginBottom:6}}>Share & <span style={{color:G}}>Earn Free Books</span></h2>
-        <p style={{color:"rgba(255,255,255,.45)",fontSize:".95rem",maxWidth:480,margin:"0 auto"}}>Love PandoraPages? Share your unique code — when your friends buy, you earn free books.</p>
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(230px,1fr))",gap:14,maxWidth:860,margin:"0 auto 36px"}}>
-        {[["🔗","Share Your Code","Share your unique referral link with parents & friends"],["🛒","They Buy","When your referral makes a purchase, it's counted automatically"],["🎁","You Earn","Get free books delivered — the more you refer, the more you earn!"]].map(([ic,t,d],i)=><div key={i} style={{background:"rgba(255,255,255,.04)",borderRadius:16,padding:"26px 18px",textAlign:"center",border:"1px solid rgba(255,255,255,.06)"}}>
-          <div style={{fontSize:28,marginBottom:4}}>{ic}</div><div style={{fontSize:".68rem",color:"rgba(255,255,255,.25)",fontWeight:700,letterSpacing:1,marginBottom:4}}>STEP {i+1}</div><h4 style={{fontFamily:"'Baloo 2',cursive",fontSize:"1.05rem",color:"#fff",marginBottom:4}}>{t}</h4><p style={{fontSize:".8rem",color:"rgba(255,255,255,.35)"}}>{d}</p>
-        </div>)}
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14,maxWidth:860,margin:"0 auto 36px"}}>
-        <div style={{background:`${G}08`,borderRadius:18,padding:"24px 22px",border:`1px solid ${G}22`,textAlign:"left"}}>
-          <div style={{fontSize:24,marginBottom:8}}>🏆</div>
-          <h3 style={{fontFamily:"'Baloo 2',cursive",fontSize:"1.15rem",color:G,marginBottom:8}}>Refer 5 Buyers</h3>
-          <p style={{fontSize:".85rem",color:"rgba(255,255,255,.55)",marginBottom:10}}>Earn 1 FREE digital book</p>
-          <div style={{height:8,background:"rgba(255,255,255,.12)",borderRadius:999,overflow:"hidden",marginBottom:8}}>
-            <div style={{height:"100%",width:`${(progressToFive/5)*100}%`,background:`linear-gradient(90deg,${G},#FFC947)`}} />
-          </div>
-          <div style={{fontSize:".8rem",color:hasFiveReward?"#7CFFB2":"rgba(255,255,255,.65)",fontWeight:700}}>
-            {progressToFive}/5 referrals {hasFiveReward?"• Reward unlocked ✅":""}
-          </div>
-        </div>
-        <div style={{background:`${L}0F`,borderRadius:18,padding:"24px 22px",border:`1px solid ${L}33`,textAlign:"left"}}>
-          <div style={{fontSize:24,marginBottom:8}}>🚀</div>
-          <h3 style={{fontFamily:"'Baloo 2',cursive",fontSize:"1.15rem",color:L,marginBottom:8}}>Refer 10 Buyers</h3>
-          <p style={{fontSize:".85rem",color:"rgba(255,255,255,.55)",marginBottom:10}}>Earn FREE personalized digital book</p>
-          <div style={{height:8,background:"rgba(255,255,255,.12)",borderRadius:999,overflow:"hidden",marginBottom:8}}>
-            <div style={{height:"100%",width:`${(progressToTen/10)*100}%`,background:`linear-gradient(90deg,${L},#C4B5FD)`}} />
-          </div>
-          <div style={{fontSize:".8rem",color:hasTenReward?"#7CFFB2":"rgba(255,255,255,.65)",fontWeight:700}}>
-            {progressToTen}/10 referrals {hasTenReward?"• Reward unlocked ✅":""}
-          </div>
-        </div>
-      </div>
-      <div style={{maxWidth:860,margin:"0 auto",background:"rgba(255,255,255,.04)",borderRadius:18,padding:"26px 28px",border:"1px solid rgba(255,255,255,.06)",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:16}}>
-        <div><div style={{fontSize:".68rem",color:"rgba(255,255,255,.25)",fontWeight:700,letterSpacing:2,marginBottom:4}}>YOUR REFERRAL CODE</div><div style={{fontFamily:"'Baloo 2',cursive",fontSize:"1.7rem",color:"#fff",letterSpacing:4}}>{profile?.referral_code||"SIGN IN"}</div><p style={{fontSize:".78rem",color:"rgba(255,255,255,.3)",marginTop:4}}>{profile?`${referrals}/10 referrals · ${Math.max(0,10-referrals)} more to max reward`:"Sign in to get your unique code"}</p></div>
-        <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          <Btn bg={`linear-gradient(135deg,${G},#FFC947)`} c={D} onClick={()=>{navigator.clipboard?.writeText(`https://pandorapages.in/?ref=${profile?.referral_code||""}`);alert("Copied!")}} s={{padding:"10px 22px",fontSize:".88rem",color:D}}>📋 Copy Referral Link</Btn>
-          <Btn bg={W} onClick={()=>window.open(`https://wa.me/?text=Hey!+Check+PandoraPages+-+kids+books+from+₹99!+Code+${profile?.referral_code||""}+📖+pandorapages.in`,"_blank")} s={{padding:"10px 22px",fontSize:".88rem"}}>💬 Share on WhatsApp</Btn>
-        </div>
       </div>
     </section>
 
@@ -805,7 +785,7 @@ export default function App(){
     const gstRatePercent = 18;
     const gstAmount = Number(((taxableAmount * gstRatePercent) / 100).toFixed(2));
     const totalAmount = Number((taxableAmount + gstAmount).toFixed(2));
-    return <div onClick={resetCk} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",backdropFilter:"blur(8px)",zIndex:1002,display:"flex",alignItems:"center",justifyContent:"center",padding:16,animation:"fadeIn .3s"}}>
+    return <div onClick={resetCk} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",backdropFilter:"blur(8px)",zIndex:1002,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
       <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:24,maxWidth:460,width:"100%",overflow:"hidden",animation:"slideUp .4s cubic-bezier(.4,0,.2,1)"}}>
         {!done?<>
           <div style={{background:`linear-gradient(135deg,${R},#6C5CE7)`,padding:"22px 22px 26px",position:"relative"}}><button onClick={resetCk} style={{position:"absolute",top:10,right:10,width:28,height:28,borderRadius:"50%",border:"none",background:"rgba(255,255,255,.15)",color:"#fff",cursor:"pointer",fontSize:13}}>✕</button><div style={{fontSize:".68rem",fontWeight:700,color:"rgba(255,255,255,.5)",letterSpacing:1,marginBottom:4}}>CHECKOUT</div><div style={{display:"flex",alignItems:"center",gap:10}}><div style={{width:44,height:44,borderRadius:12,background:"rgba(255,255,255,.12)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>{b.emoji}</div><div><div style={{fontFamily:"'Baloo 2',cursive",fontSize:"1.05rem",color:"#fff"}}>{b.title}</div><div style={{fontSize:".78rem",color:"rgba(255,255,255,.6)"}}>{b.style || "Standard"} • {b.pages} pages</div></div></div></div>
@@ -813,11 +793,10 @@ export default function App(){
             <div style={{marginBottom:18}}>
               <div style={{fontSize:".75rem",fontWeight:700,color:"#999",textTransform:"uppercase",letterSpacing:.5,marginBottom:8}}>📬 Delivery</div>
               <div style={{padding:"14px",borderRadius:14,border:`2px solid ${R}`,background:"#F8F5FF",textAlign:"center"}}>
-                <div style={{fontSize:22,marginBottom:2}}>📧</div>
-                <div style={{fontWeight:700,fontSize:".85rem",color:R}}>Email only</div>
+                <div style={{fontSize:22,marginBottom:2}}>💾</div>
+                <div style={{fontWeight:700,fontSize:".85rem",color:R}}>Automatic browser download after payment</div>
               </div>
             </div>
-            <div style={{marginBottom:18}}><label style={{fontSize:".75rem",fontWeight:700,color:"#999",textTransform:"uppercase",letterSpacing:.5,display:"block",marginBottom:5}}>📧 Email</label><input value={contact} onChange={e=>setContact(e.target.value)} placeholder="your@email.com" style={{width:"100%",padding:"11px 14px",borderRadius:12,border:"2px solid #E8E0F0",fontSize:14,fontFamily:"inherit",outline:"none"}}/></div>
             <div style={{background:"#F8F5FF",borderRadius:14,padding:"14px 16px",marginBottom:18}}>
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}><span style={{fontSize:".85rem",color:"#666"}}>{b.title}</span><span style={{fontSize:".85rem",fontWeight:700}}>₹{taxableAmount.toFixed(2)}</span></div>
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}><span style={{fontSize:".8rem",color:"#666"}}>GST ({gstRatePercent}%)</span><span style={{fontSize:".8rem",fontWeight:700}}>₹{gstAmount.toFixed(2)}</span></div>
@@ -827,7 +806,6 @@ export default function App(){
               <div style={{marginBottom:12,color:"#C0392B",fontSize:".82rem",fontWeight:700}}>{checkoutError}</div>
             )}
             <button onClick={async()=>{
-              if(!contact.trim())return;
               if(!user){setAuthMode("signin");setAuthOpen(true);return}
 
               try{
@@ -835,7 +813,7 @@ export default function App(){
                 const paymentOrder = await createDigitalPaymentOrder({
                   book_id:b.id,
                   delivery_method:"email",
-                  delivery_contact:contact.trim(),
+                  delivery_contact:user.email,
                 });
 
                 await loadRazorpaySdk();
@@ -848,19 +826,34 @@ export default function App(){
                   description: b.title,
                   order_id: paymentOrder.razorpay_order_id,
                   prefill: {
-                    email: contact.trim() || user.email,
+                    email: user.email,
                   },
                   notes: {
                     book_id: String(b.id),
-                    delivery_method: "email",
-                    delivery_contact: contact.trim(),
+                    delivery_method: "browser_download",
+                    delivery_contact: user.email,
                   },
                   handler: async function (response) {
-                    await verifyDigitalPayment({
+                    const result = await verifyDigitalPayment({
                       razorpay_order_id: response.razorpay_order_id,
                       razorpay_payment_id: response.razorpay_payment_id,
                       razorpay_signature: response.razorpay_signature,
                     });
+                    const orderId = result.order_id;
+                    try {
+                      const urls=result.download_urls||{};
+                      if(!urls.book){
+                        throw new Error("Download link is unavailable.");
+                      }
+                      if(urls.book){
+                        autoDownloadFromUrl(urls.book,0);
+                      }
+                      if(urls.cover){
+                        autoDownloadFromUrl(urls.cover,700);
+                      }
+                    } catch (_) {
+                      setCheckoutError("Payment successful, but automatic download link is unavailable or blocked by the browser.");
+                    }
                     setDone(true);
                   },
                   modal: {
@@ -873,12 +866,19 @@ export default function App(){
 
                 rz.open();
               }catch(e){
+                if(e.isAuthError){
+                  setUser(null);
+                  resetCk();
+                  setAuthMode("signin");
+                  setAuthOpen(true);
+                  return;
+                }
                 setCheckoutError(e.message || "Payment failed. Please try again.");
               }
-            }} style={{width:"100%",background:contact.trim()?`linear-gradient(135deg,${R},#6C5CE7)`:"#DDD",color:contact.trim()?"#fff":"#999",border:"none",padding:14,borderRadius:14,fontFamily:"'Baloo 2',cursive",fontSize:"1.05rem",fontWeight:700,cursor:contact.trim()?"pointer":"not-allowed"}}>💳 Pay ₹{totalAmount.toFixed(2)}</button>
+            }} style={{width:"100%",background:`linear-gradient(135deg,${R},#6C5CE7)`,color:"#fff",border:"none",padding:14,borderRadius:14,fontFamily:"'Baloo 2',cursive",fontSize:"1.05rem",fontWeight:700,cursor:"pointer"}}>💳 Pay ₹{totalAmount.toFixed(2)}</button>
           </div>
         </>:
-        <div style={{padding:"48px 26px",textAlign:"center"}}><div style={{fontSize:56,marginBottom:10,animation:"popIn .6s cubic-bezier(.68,-.55,.265,1.55)"}}>🎉</div><h2 style={{fontFamily:"'Baloo 2',cursive",fontSize:"1.5rem",color:D,marginBottom:6}}>Order Placed!</h2><p style={{fontSize:".92rem",color:"#666",lineHeight:1.7,marginBottom:8}}><strong>{b.title}</strong> → <span style={{color:R,fontWeight:700}}>{contact}</span> via {del==="email"?"Email":"WhatsApp"}</p><p style={{fontSize:".84rem",color:"#666",lineHeight:1.6,marginBottom:18}}>Invoice has been sent to your registered email with GST breakup.</p><div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}><Btn onClick={()=>{resetCk();go("collections")}}>Browse More</Btn><Btn bg={W}>💬 Join Community</Btn></div></div>}
+        <div style={{padding:"48px 26px",textAlign:"center"}}><div style={{fontSize:56,marginBottom:10,animation:"popIn .6s cubic-bezier(.68,-.55,.265,1.55)"}}>🎉</div><h2 style={{fontFamily:"'Baloo 2',cursive",fontSize:"1.5rem",color:D,marginBottom:6}}>Order Placed!</h2><p style={{fontSize:".92rem",color:"#666",lineHeight:1.7,marginBottom:8}}><strong>{b.title}</strong> — downloads have been triggered automatically.</p><p style={{fontSize:".84rem",color:"#666",lineHeight:1.6,marginBottom:18}}>Book PDF and cover image are downloaded. Invoice is sent to your registered email via Razorpay.</p><div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}><Btn onClick={()=>{resetCk();go("collections")}}>Browse More</Btn><Btn bg={W}>💬 Join Community</Btn></div></div>}
       </div>
     </div>;
   };
@@ -964,21 +964,21 @@ export default function App(){
 
   const AuthM=()=>{
     if(!authOpen) return null;
-    return <div onClick={()=>setAuthOpen(false)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",backdropFilter:"blur(8px)",zIndex:1003,display:"flex",alignItems:"center",justifyContent:"center",padding:16,animation:"fadeIn .3s"}}>
+    return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",backdropFilter:"blur(8px)",zIndex:1003,display:"flex",alignItems:"center",justifyContent:"center",padding:16,animation:"fadeIn .3s"}}>
       <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:24,maxWidth:420,width:"100%",overflow:"hidden",animation:"slideUp .4s cubic-bezier(.4,0,.2,1)"}}>
         <div style={{background:`linear-gradient(135deg,${R},#6C5CE7,${L})`,padding:"28px 24px 32px",position:"relative",textAlign:"center"}}>
           <button onClick={()=>setAuthOpen(false)} style={{position:"absolute",top:10,right:10,width:28,height:28,borderRadius:"50%",border:"none",background:"rgba(255,255,255,.15)",color:"#fff",cursor:"pointer",fontSize:13}}>✕</button>
           <div style={{fontSize:36,marginBottom:6}}>📖</div>
           <h2 style={{fontFamily:"'Baloo 2',cursive",fontSize:"1.3rem",color:"#fff",margin:0}}>{authMode==="signup"?"Join Pandora Pages":"Welcome Back"}</h2>
-          <p style={{fontSize:".82rem",color:"rgba(255,255,255,.75)",marginTop:4}}>{authMode==="signup"?"Get your unique referral code":"Sign in to track orders & referrals"}</p>
+          <p style={{fontSize:".82rem",color:"rgba(255,255,255,.75)",marginTop:4}}>{authMode==="signup"?"Create your account to get started":"Sign in to track your orders"}</p>
         </div>
         <div style={{padding:24}}>
           {authMode==="signup"&&<div style={{marginBottom:12}}><label style={{fontSize:".72rem",fontWeight:700,color:"#999",textTransform:"uppercase",letterSpacing:.5,display:"block",marginBottom:4}}>Full Name</label><input value={authForm.fullName} onChange={e=>setAuthForm(f=>({...f,fullName:e.target.value}))} placeholder="Jane Doe" style={{width:"100%",padding:"11px 14px",borderRadius:12,border:"2px solid #E8E0F0",fontSize:14,fontFamily:"inherit",outline:"none"}}/></div>}
-          {authMode==="signup"&&<div style={{marginBottom:12}}><label style={{fontSize:".72rem",fontWeight:700,color:"#999",textTransform:"uppercase",letterSpacing:.5,display:"block",marginBottom:4}}>Referral Code (optional)</label><input value={authForm.referralCode} onChange={e=>setAuthForm(f=>({...f,referralCode:e.target.value.toUpperCase()}))} placeholder="PPXXXXXX" style={{width:"100%",padding:"11px 14px",borderRadius:12,border:"2px solid #E8E0F0",fontSize:14,fontFamily:"inherit",outline:"none"}}/></div>}
+          {authMode==="signup"&&<div style={{marginBottom:12}}><label style={{fontSize:".72rem",fontWeight:700,color:"#999",textTransform:"uppercase",letterSpacing:.5,display:"block",marginBottom:4}}>Phone Number</label><input type="tel" value={authForm.phone} onChange={e=>setAuthForm(f=>({...f,phone:e.target.value}))} placeholder="10-digit mobile number" style={{width:"100%",padding:"11px 14px",borderRadius:12,border:"2px solid #E8E0F0",fontSize:14,fontFamily:"inherit",outline:"none"}}/></div>}
           <div style={{marginBottom:12}}><label style={{fontSize:".72rem",fontWeight:700,color:"#999",textTransform:"uppercase",letterSpacing:.5,display:"block",marginBottom:4}}>Email</label><input type="email" value={authForm.email} onChange={e=>setAuthForm(f=>({...f,email:e.target.value}))} placeholder="you@email.com" style={{width:"100%",padding:"11px 14px",borderRadius:12,border:"2px solid #E8E0F0",fontSize:14,fontFamily:"inherit",outline:"none"}}/></div>
           <div style={{marginBottom:14}}><label style={{fontSize:".72rem",fontWeight:700,color:"#999",textTransform:"uppercase",letterSpacing:.5,display:"block",marginBottom:4}}>Password</label><input type="password" value={authForm.password} onChange={e=>setAuthForm(f=>({...f,password:e.target.value}))} placeholder="At least 8 characters" style={{width:"100%",padding:"11px 14px",borderRadius:12,border:"2px solid #E8E0F0",fontSize:14,fontFamily:"inherit",outline:"none"}}/></div>
           {authErr&&<div style={{background:"#FEE",color:"#C0392B",padding:"10px 14px",borderRadius:10,fontSize:".82rem",marginBottom:12}}>{authErr}</div>}
-          <button onClick={submitAuth} disabled={authLoading||!authForm.email||!authForm.password} style={{width:"100%",background:authLoading||!authForm.email||!authForm.password?"#DDD":`linear-gradient(135deg,${R},#6C5CE7)`,color:authLoading||!authForm.email||!authForm.password?"#999":"#fff",border:"none",padding:14,borderRadius:14,fontFamily:"'Baloo 2',cursive",fontSize:"1.02rem",fontWeight:700,cursor:authLoading?"wait":"pointer",marginBottom:12}}>{authLoading?"...":authMode==="signup"?"✨ Create Account":"🔑 Sign In"}</button>
+          <button onClick={submitAuth} disabled={authLoading||!authForm.email||!authForm.password||(authMode==="signup"&&(!authForm.fullName||!authForm.phone))} style={{width:"100%",background:authLoading||!authForm.email||!authForm.password||(authMode==="signup"&&(!authForm.fullName||!authForm.phone))?"#DDD":`linear-gradient(135deg,${R},#6C5CE7)`,color:authLoading||!authForm.email||!authForm.password||(authMode==="signup"&&(!authForm.fullName||!authForm.phone))?"#999":"#fff",border:"none",padding:14,borderRadius:14,fontFamily:"'Baloo 2',cursive",fontSize:"1.02rem",fontWeight:700,cursor:authLoading?"wait":"pointer",marginBottom:12}}>{authLoading?"...":authMode==="signup"?"✨ Create Account":"🔑 Sign In"}</button>
           <p style={{textAlign:"center",fontSize:".88rem",color:"#666"}}>{authMode==="signup"?"Already have an account? ":"New here? "}<span onClick={()=>{setAuthMode(authMode==="signup"?"signin":"signup");setAuthErr("")}} style={{color:R,fontWeight:700,cursor:"pointer"}}>{authMode==="signup"?"Sign In":"Create Account"}</span></p>
         </div>
       </div>

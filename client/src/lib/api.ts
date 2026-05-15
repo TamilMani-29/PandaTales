@@ -6,6 +6,8 @@ const TOKEN_KEY = "pandatales_access_token";
 const ADMIN_USERNAME = "admin@123";
 const ADMIN_PASSWORD = "admin@123";
 
+export const buildApiUrl = (path: string) => `${API_BASE_URL}${path}`;
+
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
 export const setToken = (token: string) => localStorage.setItem(TOKEN_KEY, token);
 export const clearToken = () => localStorage.removeItem(TOKEN_KEY);
@@ -14,6 +16,7 @@ export type AuthUser = {
   id: string;
   email: string;
   full_name: string;
+  phone?: string | null;
   referral_code: string;
   referral_count: number;
 };
@@ -55,13 +58,19 @@ async function request<T>(
 
   if (!response.ok || !(payload as ApiResponse<T>).success) {
     const message = (payload as any)?.error?.message || "Request failed";
+    if (response.status === 401) {
+      clearToken();
+      const err = new Error(message) as Error & { isAuthError: boolean };
+      err.isAuthError = true;
+      throw err;
+    }
     throw new Error(message);
   }
 
   return (payload as ApiResponse<T>).data;
 }
 
-export async function registerUser(input: { full_name: string; email: string; password: string; referral_code?: string }) {
+export async function registerUser(input: { full_name: string; email: string; password: string; phone: string; referral_code?: string }) {
   return request<{ access_token: string; token_type: string; user: AuthUser }>("/api/v1/auth/register", {
     method: "POST",
     body: JSON.stringify(input),
@@ -171,13 +180,13 @@ export type DigitalPaymentOrder = {
   key_id: string;
   razorpay_order_id: string;
   payment_status: string;
-  delivery_method: "email" | "whatsapp";
+  delivery_method: string;
   delivery_contact: string;
 };
 
 export async function createDigitalPaymentOrder(input: {
   book_id: number;
-  delivery_method: "email" | "whatsapp";
+  delivery_method: string;
   delivery_contact: string;
 }) {
   return request<DigitalPaymentOrder>("/api/v1/payments/digital-books/create-order", {
@@ -191,7 +200,16 @@ export async function verifyDigitalPayment(input: {
   razorpay_payment_id: string;
   razorpay_signature: string;
 }) {
-  return request<{ order_id: number; payment_status: string; status: string; book_id: number }>(
+  return request<{
+    order_id: number;
+    payment_status: string;
+    status: string;
+    book_id: number;
+    invoice_email_sent?: boolean;
+    invoice_razorpay_id?: string | null;
+    invoice_razorpay_number?: string | null;
+    download_urls?: { book?: string; cover?: string };
+  }>(
     "/api/v1/payments/digital-books/verify",
     {
       method: "POST",
@@ -215,7 +233,7 @@ export type DigitalPaymentHistoryItem = {
   status: string;
   razorpay_order_id?: string | null;
   razorpay_payment_id?: string | null;
-  delivery_method: "email" | "whatsapp";
+  delivery_method: string;
   delivery_contact: string;
   delivery_status: string;
   payment_error?: string | null;
@@ -234,13 +252,56 @@ export async function getDigitalPaymentHistoryByUserId(userId: string) {
 
 export async function purchaseDigitalBook(input: {
   book_id: number;
-  delivery_method: "email" | "whatsapp";
+  delivery_method: string;
   delivery_contact: string;
 }) {
   return request<DigitalPaymentOrder>("/api/v1/payments/digital-books/purchase", {
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export async function downloadOrderFile(
+  orderId: number,
+  fileType: "book" | "cover",
+  maxAttempts = 3
+): Promise<void> {
+  const token = getToken();
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/payments/digital-books/${orderId}/download/${fileType}`,
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+      );
+      if (!response.ok) {
+        throw new Error(`Failed to download ${fileType} (status ${response.status})`);
+      }
+
+      const disposition = response.headers.get("Content-Disposition") || "";
+      const nameMatch = disposition.match(/filename="?([^"]+)"?/);
+      const filename = nameMatch ? nameMatch[1] : `${fileType}-${orderId}`;
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.rel = "noopener";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+
+      // Delay revocation for mobile browsers to avoid cancelling in-flight saves.
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      return;
+    } catch (error) {
+      lastError = error as Error;
+      await new Promise((resolve) => window.setTimeout(resolve, 450));
+    }
+  }
+
+  throw lastError ?? new Error(`Failed to download ${fileType}`);
 }
 
 function getAdminHeaders() {

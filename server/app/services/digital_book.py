@@ -11,10 +11,17 @@ from email.message import EmailMessage
 from pathlib import Path
 from uuid import uuid4
 
+import ssl
+
+import certifi
 import razorpay
+import urllib3
+from jose import jwt
+from requests.adapters import HTTPAdapter
+from requests.exceptions import RequestException, SSLError as RequestsSSLError
 from pypdf import PdfReader, PdfWriter
-from reportlab.lib.colors import Color
 from reportlab.lib.pagesizes import A4
+from reportlab.lib.colors import Color
 from reportlab.pdfgen import canvas
 from slugify import slugify
 from sqlalchemy import func, or_, select
@@ -43,22 +50,9 @@ logger = get_logger(__name__)
 
 GST_RATE_DIGITAL_PERCENT = 18
 SUPPORTED_ATTRIBUTE_OPTION_TYPES = {"book_type", "theme", "language", "genre"}
-DEFAULT_ATTRIBUTE_OPTIONS: dict[str, list[str]] = {
-    "book_type": ["story", "coloring", "activity", "workbook", "comic", "poetry"],
-    "theme": [
-        "human", "animal", "fantasy", "nature", "space", "ocean",
-        "jungle", "mythology", "sports", "technology",
-    ],
-    "language": [
-        "english", "hindi", "tamil", "telugu", "kannada",
-        "malayalam", "marathi", "bengali", "gujarati", "punjabi",
-    ],
-}
-DEFAULT_GENRES: list[str] = [
-    "fantasy", "adventure", "mystery", "humor", "educational",
-    "fairy tale", "mythology", "science fiction", "realistic fiction",
-    "poetry", "nature", "history",
-]
+MIN_RAZORPAY_ORDER_AMOUNT_PAISE = 100
+DOWNLOAD_TOKEN_TYPE = "digital_order_download"
+DOWNLOAD_TOKEN_EXP_MINUTES = 15
 
 
 class DigitalBookService:
@@ -74,6 +68,32 @@ class DigitalBookService:
             if self._key_id and self._key_secret
             else None
         )
+        if self._payment_client is not None:
+            if settings.RAZORPAY_VERIFY_SSL:
+                self._payment_client.session.verify = certifi.where()
+            else:
+                # Build a permissive SSL context that bypasses both certificate
+                # verification AND the minimum key-strength enforcement that causes
+                # "EE certificate key too weak" errors behind corporate proxies.
+                _ssl_ctx = ssl.create_default_context()
+                _ssl_ctx.check_hostname = False
+                _ssl_ctx.verify_mode = ssl.CERT_NONE
+                _ssl_ctx.set_ciphers("DEFAULT:@SECLEVEL=0")
+
+                class _WeakSSLAdapter(HTTPAdapter):
+                    def init_poolmanager(self, *args, **kwargs):
+                        kwargs["ssl_context"] = _ssl_ctx
+                        super().init_poolmanager(*args, **kwargs)
+
+                _adapter = _WeakSSLAdapter()
+                self._payment_client.session.mount("https://", _adapter)
+                self._payment_client.session.mount("http://", _adapter)
+                self._payment_client.session.verify = False
+                urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+                logger.warning(
+                    "razorpay_ssl_verification_disabled",
+                    reason="RAZORPAY_VERIFY_SSL is false; use only for local troubleshooting",
+                )
 
     async def create_book(
         self,
@@ -569,8 +589,7 @@ class DigitalBookService:
         }
 
     async def get_filter_options(self) -> dict:
-        """Return filter options sourced from constants and existing catalog data."""
-        await self._ensure_default_attribute_options()
+        """Return filter options from existing catalog data."""
 
         genres_result = await self.db.execute(select(Genre.name).order_by(Genre.name.asc()))
         genres = [name for name in genres_result.scalars().all() if name]
@@ -597,7 +616,6 @@ class DigitalBookService:
 
     async def list_attribute_options(self) -> dict[str, list[str]]:
         """Return admin-managed dropdown values for book metadata fields."""
-        await self._ensure_default_attribute_options()
         filter_options = await self.get_filter_options()
         return {
             "book_type": filter_options.get("book_types", []),
@@ -684,77 +702,6 @@ class DigitalBookService:
         await self.db.commit()
         return {"option_type": normalized_type, "value": normalized_value, "deleted": True}
 
-    async def send_pdf_to_email(self, book_id: int, recipient_email: str) -> None:
-        """Download book PDF from MinIO and email it to the recipient."""
-        book = await self.db.get(Book, book_id)
-        if not book:
-            raise NotFoundException("Book not found")
-        if not book.book_url:
-            raise BadRequestException("Book PDF URL is missing")
-
-        if not settings.SMTP_HOST or not settings.SMTP_PORT:
-            raise ServiceUnavailableException("SMTP is not configured")
-        if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
-            raise ServiceUnavailableException("SMTP credentials are missing")
-
-        pdf_bytes = await self.storage.download_file(book.book_url)
-
-        message = EmailMessage()
-        message["Subject"] = "✨ Your book is ready! Download now | Pandora Pages"
-        message["From"] = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_FROM_EMAIL}>"
-        message["To"] = recipient_email
-
-        recipient_name = self._guess_parent_name(recipient_email)
-        message.set_content(
-            f"Hi {recipient_name} 👋\n\n"
-            "You just made a child's day - maybe even their whole week.\n\n"
-            "Your book is ready right now. No waiting. No shipping. Just pure magic.\n\n"
-            "⬇️ Download Your Book Now\n"
-            "(Attached as PDF in this email)\n\n"
-            '"Every page read tonight plants a seed - for curiosity, courage, and a lifelong love of learning." 🌱\n\n'
-            "- Team PandoraPages\n\n"
-            "✨ Make it extra special\n\n"
-            "🖨️ Print and bind it\n"
-            "Turn this into a real book.\n"
-            "Any nearby print shop can spiral-bind it for just INR 100-INR 150.\n\n"
-            "📸 Capture the moment\n"
-            "Seeing a child connect with their own story is priceless.\n"
-            "Tag us on Instagram: @PandoraPages.in\n\n"
-            "🎁 Share the joy\n"
-            "Know another parent who'd love this?\n"
-            "Forward this email - it might make their child's day too.\n\n"
-            "🎨 You might also love\n"
-            "- PersonaColor Book (now just INR 129)\n"
-            "- 21-Day SkillSprint (now just INR 99)\n"
-            "- LifePath Board Game (now just INR 149)\n\n"
-            "All available instantly - download and print at home.\n\n"
-            "🎁 Share and Earn\n"
-            "Share your code with 5 parents and get a FREE digital book.\n\n"
-            "📱 Join Our Parent Community\n"
-            "Free coloring pages, mini-stories and activity ideas every week.\n\n"
-            "We'd love to hear how it goes 💛\n\n"
-            "With love,\n"
-            "PandoraPages"
-        )
-
-        attachment_name = f"{slugify(book.book_name) or 'book'}-{book.id}.pdf"
-        message.add_attachment(
-            pdf_bytes,
-            maintype="application",
-            subtype="pdf",
-            filename=attachment_name,
-        )
-
-        await asyncio.to_thread(self._send_email_sync, message)
-
-    @staticmethod
-    def _guess_parent_name(email: str) -> str:
-        local = (email or "").split("@", 1)[0].strip()
-        if not local:
-            return "there"
-        cleaned = local.replace(".", " ").replace("_", " ").replace("-", " ")
-        return " ".join(part.capitalize() for part in cleaned.split() if part) or "there"
-
     async def create_purchase_order(
         self,
         *,
@@ -781,6 +728,9 @@ class DigitalBookService:
                 "Payment gateway is not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in environment."
             )
 
+        if not user or not getattr(user, "is_active", False):
+            raise BadRequestException("User does not exist or is inactive")
+
         book = await self.db.get(Book, payload.book_id)
         if not book:
             raise NotFoundException("Book not found")
@@ -788,7 +738,8 @@ class DigitalBookService:
         if book.price is None:
             raise BadRequestException("Book price is missing")
 
-        delivery_contact = payload.delivery_contact.strip()
+        delivery_method = "browser_download"
+        delivery_contact = (user.email or "browser").strip() or "browser"
         taxable_amount_paise = int(Decimal(str(book.price)) * 100)
         gst_rate_percent = self._gst_rate_for_digital_book(book)
         gst_amount_paise = self._calculate_gst_amount_paise(
@@ -797,27 +748,54 @@ class DigitalBookService:
         )
         total_amount_paise = taxable_amount_paise + gst_amount_paise
 
-        rz_order = self._payment_client.order.create(
-            {
-                "amount": total_amount_paise,
-                "currency": "INR",
-                "payment_capture": 1,
-                "notes": {
-                    "book_id": str(book.id),
-                    "user_id": str(user.id),
-                    "delivery_method": payload.delivery_method,
-                    "delivery_contact": delivery_contact,
-                    "taxable_amount": str(taxable_amount_paise),
-                    "gst_rate_percent": str(gst_rate_percent),
-                    "gst_amount": str(gst_amount_paise),
-                },
-            }
-        )
+        if total_amount_paise < MIN_RAZORPAY_ORDER_AMOUNT_PAISE:
+            minimum_inr = Decimal(MIN_RAZORPAY_ORDER_AMOUNT_PAISE) / Decimal(100)
+            raise BadRequestException(
+                f"Order total (INR {total_amount_paise / 100:.2f}) is below Razorpay minimum "
+                f"(INR {minimum_inr:.2f}). Increase book price and try again."
+            )
+
+        try:
+            rz_order = self._payment_client.order.create(
+                {
+                    "amount": total_amount_paise,
+                    "currency": "INR",
+                    "payment_capture": 1,
+                    "notes": {
+                        "book_id": str(book.id),
+                        "user_id": str(user.id),
+                        "delivery_method": delivery_method,
+                        "delivery_contact": delivery_contact,
+                        "taxable_amount": str(taxable_amount_paise),
+                        "gst_rate_percent": str(gst_rate_percent),
+                        "gst_amount": str(gst_amount_paise),
+                    },
+                }
+            )
+        except razorpay.errors.BadRequestError as exc:
+            logger.error("razorpay_order_bad_request", error=str(exc), amount_paise=total_amount_paise)
+            raise BadRequestException(f"Payment gateway rejected order: {exc}") from exc
+        except RequestsSSLError as exc:
+            logger.error(
+                "razorpay_ssl_error",
+                error=str(exc),
+                verify_ssl=settings.RAZORPAY_VERIFY_SSL,
+                exc_info=True,
+            )
+            raise ServiceUnavailableException(
+                "Unable to connect to Razorpay due to SSL certificate validation. "
+                "Check system/proxy certificates or set RAZORPAY_VERIFY_SSL=false for local development only."
+            ) from exc
+        except RequestException as exc:
+            logger.error("razorpay_network_error", error=str(exc), exc_info=True)
+            raise ServiceUnavailableException(
+                "Payment gateway is temporarily unavailable. Please try again in a few minutes."
+            ) from exc
 
         order = DigitalBookOrder(
             user_id=user.id,
             book_id=book.id,
-            delivery_method=payload.delivery_method,
+            delivery_method=delivery_method,
             delivery_contact=delivery_contact,
             amount=total_amount_paise,
             currency="INR",
@@ -868,7 +846,9 @@ class DigitalBookService:
             raise NotFoundException("Payment order not found")
 
         if order.payment_status == "paid":
-            return await self._payment_history_item(order)
+            history_item = await self._payment_history_item(order)
+            history_item["download_urls"] = await self._build_download_urls(order)
+            return history_item
 
         expected_signature = hmac.new(
             self._key_secret.encode(),
@@ -894,36 +874,533 @@ class DigitalBookService:
         if book:
             book.download_count = (book.download_count or 0) + 1
 
-        if order.delivery_method == "email":
-            await self.send_pdf_to_email(book_id=order.book_id, recipient_email=order.delivery_contact)
-            order.delivery_status = "sent"
-            order.delivery_sent_at = datetime.now(timezone.utc)
-            order.status = "delivered"
+        if not book:
+            raise NotFoundException("Book not found")
 
-        invoice_recipients = [user.email]
-        if order.delivery_method == "email":
-            delivery_email = order.delivery_contact.strip().lower()
-            if delivery_email and delivery_email != user.email.strip().lower():
-                invoice_recipients.append(order.delivery_contact)
-
-        try:
-            await self.send_invoice_email(
-                order=order,
-                user=user,
-                book=book,
-                recipients=invoice_recipients,
-            )
-        except Exception as exc:
-            logger.warning(
-                "digital_book_invoice_email_failed",
-                order_id=order.id,
-                user_id=str(user.id),
-                error=str(exc),
-            )
+        invoice_result = await self.create_and_email_razorpay_invoice(
+            order=order,
+            user=user,
+            book=book,
+        )
+        order.delivery_method = "browser_download"
+        order.delivery_contact = (user.email or "browser").strip() or "browser"
+        order.delivery_status = "ready"
+        order.delivery_sent_at = datetime.now(timezone.utc)
+        order.status = "delivered"
 
         await self.db.commit()
         await self.db.refresh(order)
-        return await self._payment_history_item(order)
+        response = await self._payment_history_item(order)
+        response["invoice_email_sent"] = invoice_result.get("invoice_email_sent", False)
+        response["invoice_razorpay_id"] = invoice_result.get("invoice_razorpay_id")
+        response["invoice_razorpay_number"] = invoice_result.get("invoice_razorpay_number")
+        response["download_urls"] = await self._build_download_urls(order)
+        return response
+
+    async def _build_download_urls(self, order: DigitalBookOrder) -> dict[str, str]:
+        """Return short-lived same-origin download links for browser-safe downloads."""
+        book = await self.db.get(Book, order.book_id)
+        if not book:
+            return {}
+
+        download_urls: dict[str, str] = {}
+        if book.book_url:
+            book_token = self._create_order_download_token(
+                user_id=str(order.user_id),
+                order_id=order.id,
+                file_type="book",
+            )
+            download_urls["book"] = (
+                f"/api/v1/payments/digital-books/{order.id}/download/book/public?token={book_token}"
+            )
+
+        cover_source = book.cover_image_url or book.front_image_url or book.back_image_url
+        if cover_source:
+            cover_token = self._create_order_download_token(
+                user_id=str(order.user_id),
+                order_id=order.id,
+                file_type="cover",
+            )
+            download_urls["cover"] = (
+                f"/api/v1/payments/digital-books/{order.id}/download/cover/public?token={cover_token}"
+            )
+
+        return download_urls
+
+    @staticmethod
+    def _create_order_download_token(*, user_id: str, order_id: int, file_type: str) -> str:
+        expire = datetime.now(timezone.utc) + timedelta(minutes=DOWNLOAD_TOKEN_EXP_MINUTES)
+        payload = {
+            "sub": user_id,
+            "order_id": order_id,
+            "file_type": file_type,
+            "type": DOWNLOAD_TOKEN_TYPE,
+            "exp": expire,
+        }
+        return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+
+    async def save_purchase_artifacts_locally(
+        self,
+        *,
+        order: DigitalBookOrder,
+        user: User,
+        book: Book,
+    ) -> dict[str, str]:
+        """Save paid order artifacts (cover and PDF) to local disk."""
+        if not book.book_url:
+            raise BadRequestException("Book PDF URL is missing")
+
+        base_dir = Path(settings.LOCAL_DIGITAL_DELIVERY_DIR)
+        timestamp_label = (order.paid_at or datetime.now(timezone.utc)).strftime("%Y%m%d-%H%M%S")
+        order_dir_name = f"order-{order.id}-{timestamp_label}"
+        order_dir = base_dir / order_dir_name
+        order_dir.mkdir(parents=True, exist_ok=True)
+
+        safe_book_name = slugify(book.book_name) or f"book-{book.id}"
+
+        pdf_bytes = await self.storage.download_file(book.book_url)
+        pdf_filename = f"{safe_book_name}-{order.id}.pdf"
+        pdf_path = order_dir / pdf_filename
+        await asyncio.to_thread(pdf_path.write_bytes, pdf_bytes)
+
+        cover_source = book.cover_image_url or book.front_image_url or book.back_image_url
+        cover_filename = ""
+        if cover_source:
+            cover_bytes = await self.storage.download_file(cover_source)
+            cover_ext = Path(cover_source).suffix.lower() or ".jpg"
+            cover_filename = f"{safe_book_name}-cover-{order.id}{cover_ext}"
+            cover_path = order_dir / cover_filename
+            await asyncio.to_thread(cover_path.write_bytes, cover_bytes)
+
+        logger.info(
+            "digital_order_saved_locally",
+            order_id=order.id,
+            order_dir=str(order_dir),
+            pdf_file=pdf_filename,
+            cover_file=cover_filename,
+        )
+
+        return {
+            "order_directory": str(order_dir).replace("\\", "/"),
+            "pdf_file": pdf_filename,
+            "cover_file": cover_filename,
+        }
+
+    async def create_and_email_razorpay_invoice(
+        self,
+        *,
+        order: DigitalBookOrder,
+        user: User,
+        book: Book,
+    ) -> dict[str, str | bool | None]:
+        """Create Razorpay invoice and trigger invoice email to registered user."""
+        taxable_amount_paise = int(Decimal(str(book.price)) * 100) if book.price is not None else order.amount
+        gst_rate_percent = self._gst_rate_for_digital_book(book)
+        gst_amount_paise = max(order.amount - taxable_amount_paise, 0)
+        invoice_number = f"INV-{datetime.now(timezone.utc):%Y}-{order.id:06d}"
+        invoice_receipt = invoice_number
+        customer_name = (user.full_name or user.first_name or "Customer").strip() or "Customer"
+        customer_contact = ""
+        if user.phone:
+            customer_contact = "".join(ch for ch in str(user.phone) if ch.isdigit())
+        if customer_contact and len(customer_contact) < 10:
+            customer_contact = ""
+
+        is_intra_state = self._is_intra_state_supply()
+        igst_amount_paise, cgst_amount_paise, sgst_amount_paise = self._split_gst_components(
+            gst_amount_paise,
+            is_intra_state=is_intra_state,
+        )
+
+        invoice_payload: dict = {
+            "type": "invoice",
+            "draft": 0,
+            "currency": "INR",
+            "receipt": invoice_receipt,
+            "description": f"Digital book purchase - Order #{order.id}",
+            "customer": {
+                "name": customer_name,
+                "email": user.email,
+                "contact": customer_contact,
+            },
+            "line_items": [
+                {
+                    "name": book.book_name,
+                    "description": "Digital book (taxable amount)",
+                    "amount": taxable_amount_paise,
+                    "currency": "INR",
+                    "quantity": 1,
+                    "hsn_code": "99843",
+                },
+                {
+                    "name": f"GST @{gst_rate_percent}%",
+                    "description": "GST component",
+                    "amount": gst_amount_paise,
+                    "currency": "INR",
+                    "quantity": 1,
+                    "hsn_code": "99843",
+                },
+            ],
+            "email_notify": 1,
+            "sms_notify": 0,
+            "notes": {
+                "order_id": str(order.id),
+                "payment_id": order.razorpay_payment_id or "",
+                "seller_gstin": settings.SELLER_GSTIN,
+                "customer_name": customer_name,
+                "customer_email": user.email,
+                "customer_contact": customer_contact,
+                "hsn_sac": "99843",
+                "taxable_amount_inr": f"{taxable_amount_paise / 100:.2f}",
+                "gst_rate_percent": str(gst_rate_percent),
+                "igst_inr": f"{igst_amount_paise / 100:.2f}",
+                "cgst_inr": f"{cgst_amount_paise / 100:.2f}",
+                "sgst_inr": f"{sgst_amount_paise / 100:.2f}",
+            },
+        }
+
+        if not customer_contact:
+            invoice_payload["customer"].pop("contact", None)
+
+        if not self._payment_client:
+            smtp_sent = await self._send_digital_invoice_email(
+                order=order,
+                user=user,
+                book=book,
+                invoice_number=invoice_number,
+                taxable_amount_paise=taxable_amount_paise,
+                gst_rate_percent=gst_rate_percent,
+                gst_amount_paise=gst_amount_paise,
+            )
+            return {
+                "invoice_email_sent": smtp_sent,
+                "invoice_razorpay_id": None,
+                "invoice_razorpay_number": None,
+            }
+
+        try:
+            rz_invoice = await asyncio.to_thread(self._payment_client.invoice.create, invoice_payload)
+            invoice_id = rz_invoice.get("id")
+            invoice_number = rz_invoice.get("invoice_number") or invoice_number
+            notify_sent = False
+
+            try:
+                if invoice_id:
+                    await asyncio.to_thread(self._payment_client.invoice.notify_by, invoice_id, "email")
+                    notify_sent = True
+            except Exception:
+                logger.warning(
+                    "razorpay_invoice_notify_failed",
+                    order_id=order.id,
+                    invoice_id=invoice_id,
+                )
+
+            smtp_sent = False
+            try:
+                smtp_sent = await self._send_digital_invoice_email(
+                    order=order,
+                    user=user,
+                    book=book,
+                    invoice_number=invoice_number,
+                    taxable_amount_paise=taxable_amount_paise,
+                    gst_rate_percent=gst_rate_percent,
+                    gst_amount_paise=gst_amount_paise,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "digital_invoice_smtp_fallback_failed",
+                    order_id=order.id,
+                    email=user.email,
+                    error=str(exc),
+                )
+
+            logger.info(
+                "razorpay_invoice_created",
+                order_id=order.id,
+                invoice_id=invoice_id,
+                invoice_number=invoice_number,
+                email=user.email,
+            )
+
+            if not (notify_sent or smtp_sent):
+                logger.warning(
+                    "digital_invoice_not_sent",
+                    order_id=order.id,
+                    invoice_id=invoice_id,
+                    email=user.email,
+                    reason="Razorpay notify and SMTP fallback both unavailable/failed",
+                )
+
+            return {
+                "invoice_email_sent": bool(notify_sent or smtp_sent),
+                "invoice_razorpay_id": invoice_id,
+                "invoice_razorpay_number": invoice_number,
+            }
+        except Exception as exc:
+            smtp_sent = False
+            try:
+                smtp_sent = await self._send_digital_invoice_email(
+                    order=order,
+                    user=user,
+                    book=book,
+                    invoice_number=invoice_number,
+                    taxable_amount_paise=taxable_amount_paise,
+                    gst_rate_percent=gst_rate_percent,
+                    gst_amount_paise=gst_amount_paise,
+                )
+            except Exception as email_exc:
+                logger.warning(
+                    "digital_invoice_email_fallback_after_razorpay_failure_failed",
+                    order_id=order.id,
+                    email=user.email,
+                    error=str(email_exc),
+                )
+
+            logger.error(
+                "razorpay_invoice_create_failed",
+                order_id=order.id,
+                email=user.email,
+                error=str(exc),
+                exc_info=True,
+            )
+            return {
+                "invoice_email_sent": smtp_sent,
+                "invoice_razorpay_id": None,
+                "invoice_razorpay_number": None,
+            }
+
+    async def _send_digital_invoice_email(
+        self,
+        *,
+        order: DigitalBookOrder,
+        user: User,
+        book: Book,
+        invoice_number: str,
+        taxable_amount_paise: int,
+        gst_rate_percent: int,
+        gst_amount_paise: int,
+    ) -> bool:
+        if not settings.SMTP_HOST or not settings.SMTP_PORT:
+            return False
+        if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
+            return False
+        if not user.email:
+            return False
+
+        total_amount_paise = order.amount
+        customer_name = (user.full_name or user.first_name or "Customer").strip() or "Customer"
+        customer_phone = (user.phone or "").strip() or "Unavailable"
+        igst_amount_paise, cgst_amount_paise, sgst_amount_paise = self._split_gst_components(
+            gst_amount_paise,
+            is_intra_state=self._is_intra_state_supply(),
+        )
+
+        invoice_pdf = self._build_digital_invoice_pdf_bytes(
+            invoice_number=invoice_number,
+            order=order,
+            book=book,
+            customer_name=customer_name,
+            customer_email=user.email,
+            customer_phone=customer_phone,
+            taxable_amount_paise=taxable_amount_paise,
+            gst_rate_percent=gst_rate_percent,
+            gst_amount_paise=gst_amount_paise,
+            igst_amount_paise=igst_amount_paise,
+            cgst_amount_paise=cgst_amount_paise,
+            sgst_amount_paise=sgst_amount_paise,
+            total_amount_paise=total_amount_paise,
+        )
+
+        message = EmailMessage()
+        message["Subject"] = f"GST Invoice for digital order #{order.id} - Panda Tales"
+        message["From"] = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_FROM_EMAIL}>"
+        message["To"] = user.email
+        message.set_content(
+            f"Hi {customer_name},\n\n"
+            "Thanks for your digital purchase with Panda Tales.\n"
+            "Please find your GST invoice attached.\n\n"
+            f"Invoice Number: {invoice_number}\n"
+            f"Customer Name: {customer_name}\n"
+            f"Customer Email: {user.email}\n"
+            f"Customer Phone: {customer_phone}\n"
+            f"Book: {book.book_name}\n"
+            "HSN/SAC: 99843\n"
+            f"Taxable Amount: INR {taxable_amount_paise / 100:.2f}\n"
+            f"GST ({gst_rate_percent}%): INR {gst_amount_paise / 100:.2f}\n"
+            f"IGST: INR {igst_amount_paise / 100:.2f}\n"
+            f"CGST: INR {cgst_amount_paise / 100:.2f}\n"
+            f"SGST: INR {sgst_amount_paise / 100:.2f}\n"
+            f"Grand Total: INR {total_amount_paise / 100:.2f}\n\n"
+            "Regards,\n"
+            "Panda Tales"
+        )
+        message.add_attachment(
+            invoice_pdf,
+            maintype="application",
+            subtype="pdf",
+            filename=f"digital-invoice-{order.id}.pdf",
+        )
+
+        await asyncio.to_thread(self._send_email_sync, message)
+        return True
+
+    @staticmethod
+    def _send_email_sync(message: EmailMessage) -> None:
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=30) as server:
+            server.starttls()
+            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+            server.send_message(message)
+
+    def _build_digital_invoice_pdf_bytes(
+        self,
+        *,
+        invoice_number: str,
+        order: DigitalBookOrder,
+        book: Book,
+        customer_name: str,
+        customer_email: str,
+        customer_phone: str,
+        taxable_amount_paise: int,
+        gst_rate_percent: int,
+        gst_amount_paise: int,
+        igst_amount_paise: int,
+        cgst_amount_paise: int,
+        sgst_amount_paise: int,
+        total_amount_paise: int,
+    ) -> bytes:
+        buffer = io.BytesIO()
+        page_w, page_h = A4
+        pdf = canvas.Canvas(buffer, pagesize=A4)
+
+        left = 50
+        right = page_w - 50
+        y = page_h - 50
+
+        pdf.setFont("Helvetica-Bold", 20)
+        pdf.drawString(left, y, "TAX INVOICE")
+        pdf.setFont("Helvetica", 9)
+        pdf.drawString(left, y - 14, "Panda Tales")
+
+        meta_x = right - 230
+        meta_top = y + 8
+        meta_bottom = y - 72
+        pdf.rect(meta_x, meta_bottom, 230, meta_top - meta_bottom)
+        pdf.setFont("Helvetica", 9)
+        pdf.drawString(meta_x + 10, meta_top - 14, f"Invoice No: {invoice_number}")
+        pdf.drawString(meta_x + 10, meta_top - 28, f"Invoice Date: {datetime.now(timezone.utc):%Y-%m-%d %H:%M UTC}")
+        pdf.drawString(meta_x + 10, meta_top - 42, f"Order ID: {order.id}")
+        if order.razorpay_payment_id:
+            pdf.drawString(meta_x + 10, meta_top - 56, f"Payment ID: {order.razorpay_payment_id}")
+        elif order.paid_at:
+            pdf.drawString(meta_x + 10, meta_top - 56, f"Paid At: {order.paid_at:%Y-%m-%d %H:%M UTC}")
+
+        y = meta_bottom - 16
+        box_h = 68
+        gap = 12
+        half_w = (right - left - gap) / 2
+
+        pdf.rect(left, y - box_h, half_w, box_h)
+        pdf.rect(left + half_w + gap, y - box_h, half_w, box_h)
+
+        pdf.setFont("Helvetica-Bold", 10)
+        pdf.drawString(left + 8, y - 14, "Bill To")
+        pdf.drawString(left + half_w + gap + 8, y - 14, "Seller")
+
+        pdf.setFont("Helvetica", 9)
+        pdf.drawString(left + 8, y - 30, customer_name)
+        pdf.drawString(left + 8, y - 44, customer_email)
+        pdf.drawString(left + 8, y - 58, customer_phone)
+
+        pdf.drawString(left + half_w + gap + 8, y - 30, settings.SMTP_FROM_NAME)
+        pdf.drawString(left + half_w + gap + 8, y - 44, f"GSTIN: {settings.SELLER_GSTIN}")
+        pdf.drawString(left + half_w + gap + 8, y - 58, "Country: India")
+
+        y -= box_h + 20
+
+        table_top = y
+        row_h = 20
+        table_rows = 2
+        table_h = row_h * table_rows
+        col_widths = [26, 184, 66, 80, 44, 70, 76]
+        table_w = sum(col_widths)
+
+        pdf.rect(left, table_top - table_h, table_w, table_h)
+        x = left
+        for w in col_widths[:-1]:
+            x += w
+            pdf.line(x, table_top, x, table_top - table_h)
+        pdf.line(left, table_top - row_h, left + table_w, table_top - row_h)
+
+        pdf.setFillColor(Color(0.95, 0.95, 0.95))
+        pdf.rect(left, table_top - row_h, table_w, row_h, fill=1, stroke=0)
+        pdf.setFillColor(Color(0, 0, 0))
+
+        headers = ["#", "Description", "HSN/SAC", "Taxable", "GST %", "GST Amt", "Total"]
+        x = left
+        pdf.setFont("Helvetica-Bold", 9)
+        for idx, title in enumerate(headers):
+            align_right = idx in (3, 5, 6)
+            if align_right:
+                pdf.drawRightString(x + col_widths[idx] - 4, table_top - 14, title)
+            else:
+                pdf.drawString(x + 4, table_top - 14, title)
+            x += col_widths[idx]
+
+        values = [
+            "1",
+            f"{book.book_name} (Digital)",
+            "99843",
+            f"INR {taxable_amount_paise / 100:.2f}",
+            f"{gst_rate_percent}%",
+            f"INR {gst_amount_paise / 100:.2f}",
+            f"INR {total_amount_paise / 100:.2f}",
+        ]
+        x = left
+        pdf.setFont("Helvetica", 9)
+        for idx, value in enumerate(values):
+            align_right = idx in (3, 5, 6)
+            if align_right:
+                pdf.drawRightString(x + col_widths[idx] - 4, table_top - row_h - 14, value)
+            else:
+                pdf.drawString(x + 4, table_top - row_h - 14, value)
+            x += col_widths[idx]
+
+        y = table_top - table_h - 16
+
+        summary_w = 230
+        summary_h = 92
+        summary_x = right - summary_w
+        pdf.rect(summary_x, y - summary_h, summary_w, summary_h)
+        pdf.setFont("Helvetica-Bold", 10)
+        pdf.drawString(summary_x + 8, y - 14, "Tax Summary")
+        pdf.setFont("Helvetica", 9)
+        pdf.drawString(summary_x + 8, y - 30, f"IGST: INR {igst_amount_paise / 100:.2f}")
+        pdf.drawString(summary_x + 8, y - 44, f"CGST: INR {cgst_amount_paise / 100:.2f}")
+        pdf.drawString(summary_x + 8, y - 58, f"SGST: INR {sgst_amount_paise / 100:.2f}")
+        pdf.setFont("Helvetica-Bold", 10)
+        pdf.drawString(summary_x + 8, y - 78, "Grand Total")
+        pdf.drawRightString(summary_x + summary_w - 8, y - 78, f"INR {total_amount_paise / 100:.2f}")
+
+        pdf.setFont("Helvetica", 8)
+        pdf.drawString(left, y - summary_h - 14, "GST summary: Digital products 18%.")
+
+        pdf.showPage()
+        pdf.save()
+        return buffer.getvalue()
+
+    @staticmethod
+    def _split_gst_components(gst_amount_paise: int, *, is_intra_state: bool) -> tuple[int, int, int]:
+        if gst_amount_paise <= 0:
+            return 0, 0, 0
+        if not is_intra_state:
+            return gst_amount_paise, 0, 0
+        cgst = gst_amount_paise // 2
+        sgst = gst_amount_paise - cgst
+        return 0, cgst, sgst
+
+    @staticmethod
+    def _is_intra_state_supply() -> bool:
+        return bool(settings.GST_INTRA_STATE_BY_DEFAULT)
 
     async def list_payment_history(self, *, user_id) -> list[dict]:
         """List digital payment history for one user."""
@@ -1024,8 +1501,6 @@ class DigitalBookService:
         normalized_type = self._normalize_option_type(option_type)
         normalized_value = self._normalize_option_value(value)
 
-        await self._ensure_default_attribute_options()
-
         result = await self.db.execute(
             select(BookAttributeOption.id).where(
                 BookAttributeOption.option_type == normalized_type,
@@ -1037,42 +1512,6 @@ class DigitalBookService:
         if option_id is None:
             raise BadRequestException(f"{normalized_type} option is invalid")
         return int(option_id)
-
-    async def _ensure_default_attribute_options(self) -> None:
-        changed = False
-        for option_type, values in DEFAULT_ATTRIBUTE_OPTIONS.items():
-            for value in values:
-                normalized_value = self._normalize_option_value(value)
-                result = await self.db.execute(
-                    select(BookAttributeOption).where(
-                        BookAttributeOption.option_type == option_type,
-                        BookAttributeOption.value == normalized_value,
-                    )
-                )
-                row = result.scalar_one_or_none()
-                if row is None:
-                    self.db.add(
-                        BookAttributeOption(
-                            option_type=option_type,
-                            value=normalized_value,
-                            is_active=True,
-                        )
-                    )
-                    changed = True
-                elif not row.is_active:
-                    row.is_active = True
-                    changed = True
-
-        # Seed default genres into the genres table
-        for genre_name in DEFAULT_GENRES:
-            normalized = self._normalize_option_value(genre_name)
-            result = await self.db.execute(select(Genre).where(Genre.name == normalized))
-            if result.scalar_one_or_none() is None:
-                self.db.add(Genre(name=normalized))
-                changed = True
-
-        if changed:
-            await self.db.commit()
 
     @staticmethod
     def _normalize_option_type(option_type: str) -> str:
@@ -1186,6 +1625,11 @@ class DigitalBookService:
         if not object_name:
             return None
 
+        public_base = (settings.MINIO_PUBLIC_BASE_URL or "").strip().rstrip("/")
+        if public_base:
+            object_path = str(object_name).lstrip("/")
+            return f"{public_base}/{settings.MINIO_BUCKET}/{object_path}"
+
         try:
             return await self.storage.get_file_url(
                 object_name,
@@ -1200,22 +1644,6 @@ class DigitalBookService:
                 object_name=object_name,
             )
             return None
-
-    def _send_email_sync(self, message: EmailMessage) -> None:
-        """Blocking SMTP send wrapped by asyncio.to_thread in async call sites."""
-        try:
-            with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=30) as server:
-                server.starttls()
-                server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-                server.send_message(message)
-        except smtplib.SMTPAuthenticationError as exc:
-            logger.error("digital_book_email_auth_failed", error=str(exc), exc_info=True)
-            raise BadRequestException(
-                "SMTP authentication failed. For Gmail, enable 2-Step Verification and use an App Password."
-            )
-        except Exception as exc:
-            logger.error("digital_book_email_send_failed", error=str(exc), exc_info=True)
-            raise ServiceUnavailableException("Failed to send email with PDF attachment")
 
     def _generate_watermarked_pdf_sync(self, pdf_bytes: bytes, watermark_text: str) -> bytes:
         """Apply diagonal text watermark on every page of a PDF."""
@@ -1278,146 +1706,3 @@ class DigitalBookService:
         _ = book
         return GST_RATE_DIGITAL_PERCENT
 
-    async def send_invoice_email(
-        self,
-        *,
-        order: DigitalBookOrder,
-        user: User,
-        book: Book | None,
-        recipients: list[str],
-    ) -> None:
-        if not recipients:
-            return
-
-        if not settings.SMTP_HOST or not settings.SMTP_PORT:
-            raise ServiceUnavailableException("SMTP is not configured")
-        if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
-            raise ServiceUnavailableException("SMTP credentials are missing")
-
-        book_name = book.book_name if book else f"Book #{order.book_id}"
-        taxable_amount_paise = int(Decimal(str(book.price)) * 100) if book and book.price is not None else order.amount
-        gst_rate_percent = self._gst_rate_for_digital_book(book) if book else 0
-        gst_amount_paise = max(order.amount - taxable_amount_paise, 0)
-
-        invoice_number = f"INV-DB-{order.id}-{datetime.now(timezone.utc):%Y%m%d}"
-        invoice_pdf = self._build_invoice_pdf_bytes(
-            invoice_number=invoice_number,
-            order_id=str(order.id),
-            customer_name=user.full_name or user.first_name,
-            customer_email=user.email,
-            item_name=book_name,
-            taxable_amount_paise=taxable_amount_paise,
-            gst_rate_percent=gst_rate_percent,
-            gst_amount_paise=gst_amount_paise,
-            total_amount_paise=order.amount,
-            paid_at=order.paid_at,
-            payment_id=order.razorpay_payment_id,
-        )
-
-        message = EmailMessage()
-        message["Subject"] = f"Invoice for order #{order.id} - Panda Tales"
-        message["From"] = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_FROM_EMAIL}>"
-        message["To"] = ", ".join(dict.fromkeys(recipients))
-        message.set_content(
-            "Hi,\n\n"
-            "Thank you for your purchase on Panda Tales.\n"
-            "Your tax invoice is attached as a PDF.\n\n"
-            "Regards,\n"
-            "Panda Tales"
-        )
-
-        message.add_attachment(
-            invoice_pdf,
-            maintype="application",
-            subtype="pdf",
-            filename=f"invoice-{order.id}.pdf",
-        )
-
-        await asyncio.to_thread(self._send_email_sync, message)
-
-    def _build_invoice_pdf_bytes(
-        self,
-        *,
-        invoice_number: str,
-        order_id: str,
-        customer_name: str,
-        customer_email: str,
-        item_name: str,
-        taxable_amount_paise: int,
-        gst_rate_percent: int,
-        gst_amount_paise: int,
-        total_amount_paise: int,
-        paid_at: datetime | None,
-        payment_id: str | None,
-    ) -> bytes:
-        buffer = io.BytesIO()
-        page_w, page_h = A4
-        pdf = canvas.Canvas(buffer, pagesize=A4)
-
-        left = 50
-        y = page_h - 50
-
-        pdf.setFont("Helvetica-Bold", 18)
-        pdf.drawString(left, y, "TAX INVOICE")
-        y -= 24
-        pdf.setFont("Helvetica", 10)
-        pdf.drawString(left, y, f"Seller: {settings.SMTP_FROM_NAME}")
-        y -= 14
-        pdf.drawString(left, y, f"Invoice No: {invoice_number}")
-        y -= 14
-        pdf.drawString(left, y, f"Order ID: {order_id}")
-        y -= 14
-        pdf.drawString(left, y, f"Invoice Date: {datetime.now(timezone.utc):%Y-%m-%d %H:%M UTC}")
-        y -= 14
-        if paid_at:
-            pdf.drawString(left, y, f"Paid At: {paid_at:%Y-%m-%d %H:%M UTC}")
-            y -= 14
-        if payment_id:
-            pdf.drawString(left, y, f"Payment ID: {payment_id}")
-            y -= 14
-
-        y -= 6
-        pdf.setFont("Helvetica-Bold", 11)
-        pdf.drawString(left, y, "Bill To")
-        y -= 16
-        pdf.setFont("Helvetica", 10)
-        pdf.drawString(left, y, customer_name or "Customer")
-        y -= 14
-        pdf.drawString(left, y, customer_email)
-
-        y -= 24
-        pdf.setFont("Helvetica-Bold", 10)
-        pdf.drawString(left, y, "Item")
-        pdf.drawString(left + 260, y, "Taxable")
-        pdf.drawString(left + 350, y, "GST")
-        pdf.drawString(left + 430, y, "Total")
-        y -= 10
-        pdf.line(left, y, page_w - left, y)
-
-        y -= 18
-        pdf.setFont("Helvetica", 10)
-        pdf.drawString(left, y, item_name)
-        pdf.drawRightString(left + 330, y, f"INR {taxable_amount_paise / 100:.2f}")
-        pdf.drawRightString(left + 420, y, f"{gst_rate_percent}%")
-        pdf.drawRightString(page_w - left, y, f"INR {total_amount_paise / 100:.2f}")
-
-        y -= 14
-        pdf.drawString(left, y, f"GST Amount: INR {gst_amount_paise / 100:.2f}")
-        y -= 20
-        pdf.line(left, y, page_w - left, y)
-        y -= 18
-        pdf.setFont("Helvetica-Bold", 11)
-        pdf.drawString(left, y, "Grand Total")
-        pdf.drawRightString(page_w - left, y, f"INR {total_amount_paise / 100:.2f}")
-
-        y -= 20
-        pdf.setFont("Helvetica", 9)
-        pdf.drawString(
-            left,
-            y,
-            f"GST applied: {gst_rate_percent}% (Digital products: 18%, Physical books: 0% where applicable).",
-        )
-
-        pdf.showPage()
-        pdf.save()
-        return buffer.getvalue()

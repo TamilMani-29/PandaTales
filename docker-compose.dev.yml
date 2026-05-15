@@ -106,6 +106,7 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
       MINIO_BUCKET: ${MINIO_BUCKET:-pandatales}
       MINIO_SECURE: "false"
+      MINIO_PUBLIC_BASE_URL: ${MINIO_PUBLIC_BASE_URL:-http://localhost:9000}
       
       # JWT & Security
       SECRET_KEY: ${SECRET_KEY:-dev_secret_key_at_least_32_characters_long_12345}
@@ -117,12 +118,21 @@ services:
       # App Settings
       APP_ENV: development
       DEBUG: "true"
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
       
       # API Keys (Optional - set via .env)
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+      RAZORPAY_VERIFY_SSL: ${RAZORPAY_VERIFY_SSL:-true}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-noreply@pandatales.com}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Panda Tales}
       REPLICATE_API_TOKEN: ${REPLICATE_API_TOKEN:-}
       
     command: >
@@ -140,7 +150,7 @@ services:
         uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
       "
 
-  # Frontend (Next.js) - Development
+  # Frontend (Vite React) - Development
   frontend:
     build:
       context: ./client
@@ -160,8 +170,8 @@ services:
       - pandatales_network
     environment:
       NODE_ENV: development
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
-      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+      VITE_PROXY_TARGET: ${VITE_PROXY_TARGET:-http://backend:8000}
     command: npm run dev
 
 volumes:

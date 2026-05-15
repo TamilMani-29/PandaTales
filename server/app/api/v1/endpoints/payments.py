@@ -1,14 +1,22 @@
 """Payment API routes."""
 
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
+from fastapi.responses import Response
+from jose import JWTError, jwt
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common import success_response
-from app.common.exceptions import BadRequestException, ForbiddenException
+from app.common.exceptions import BadRequestException, ForbiddenException, NotFoundException, UnauthorizedException
+from app.core.config import settings
 from app.core.security import get_current_user
 from app.db.session import get_db
+from app.models.book import Book
+from app.models.digital_book_order import DigitalBookOrder
 from app.models.user import User
 from app.schemas.digital_book import (
     DigitalBookPaymentCreateRequest,
@@ -16,6 +24,7 @@ from app.schemas.digital_book import (
     DigitalBookPurchaseRequest,
 )
 from app.services.digital_book import DigitalBookService
+from app.services.storage import StorageService
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
 
@@ -25,7 +34,7 @@ router = APIRouter(prefix="/payments", tags=["Payments"])
     response_model=dict,
     status_code=status.HTTP_201_CREATED,
     summary="Create digital payment order",
-    description="Collect delivery contact (email/whatsapp), create Razorpay order, and persist pending payment record.",
+    description="Create Razorpay order and persist pending payment record for local digital asset delivery.",
 )
 async def create_digital_book_payment_order(
     payload: DigitalBookPaymentCreateRequest,
@@ -43,7 +52,7 @@ async def create_digital_book_payment_order(
     response_model=dict,
     status_code=status.HTTP_200_OK,
     summary="Verify digital payment",
-    description="Verify Razorpay signature, mark payment status, and email PDF if delivery is email.",
+    description="Verify Razorpay signature, return browser download URLs, and email invoice via Razorpay Invoice API.",
 )
 async def verify_digital_book_payment(
     payload: DigitalBookPaymentVerifyRequest,
@@ -120,3 +129,154 @@ async def purchase_digital_book(
     service = DigitalBookService(db)
     data = await service.create_purchase_order(user=current_user, payload=payload)
     return success_response(data=data, message="Digital book purchased successfully")
+
+
+_SUPPORTED_FILE_TYPES = {"book", "cover"}
+
+_DOWNLOAD_TOKEN_TYPE = "digital_order_download"
+_DOWNLOAD_TOKEN_EXP_MINUTES = 15
+
+
+def _create_download_token(*, user_id: str, order_id: int, file_type: str) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(minutes=_DOWNLOAD_TOKEN_EXP_MINUTES)
+    payload = {
+        "sub": user_id,
+        "order_id": order_id,
+        "file_type": file_type,
+        "type": _DOWNLOAD_TOKEN_TYPE,
+        "exp": expire,
+    }
+    return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+
+
+def _decode_download_token(*, token: str, order_id: int, file_type: str) -> UUID:
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        token_type = payload.get("type")
+        token_order_id = int(payload.get("order_id"))
+        token_file_type = str(payload.get("file_type"))
+        user_id = payload.get("sub")
+        if (
+            token_type != _DOWNLOAD_TOKEN_TYPE
+            or token_order_id != order_id
+            or token_file_type != file_type
+            or not user_id
+        ):
+            raise UnauthorizedException("Invalid download token")
+        return UUID(str(user_id))
+    except (JWTError, ValueError, TypeError):
+        raise UnauthorizedException("Invalid or expired download token")
+
+
+async def _resolve_order_file(
+    *,
+    db: AsyncSession,
+    order_id: int,
+    file_type: str,
+    user_id: UUID,
+) -> tuple[str, str, str]:
+    if file_type not in _SUPPORTED_FILE_TYPES:
+        raise BadRequestException(f"Invalid file_type '{file_type}'. Must be one of: book, cover")
+
+    result = await db.execute(select(DigitalBookOrder).where(DigitalBookOrder.id == order_id))
+    order = result.scalar_one_or_none()
+    if not order:
+        raise NotFoundException("Order not found")
+    if order.user_id != user_id:
+        raise ForbiddenException("You can only download your own orders")
+    if order.payment_status != "paid":
+        raise BadRequestException("Payment not completed for this order")
+
+    book = await db.get(Book, order.book_id)
+    if not book:
+        raise NotFoundException("Book not found")
+
+    if file_type == "book":
+        object_name = book.book_url
+        if not object_name:
+            raise NotFoundException("Book PDF is not available")
+        media_type = "application/pdf"
+        filename = Path(object_name).name or f"book-{order_id}.pdf"
+        return object_name, media_type, filename
+
+    object_name = book.cover_image_url or book.front_image_url or book.back_image_url
+    if not object_name:
+        raise NotFoundException("Cover image is not available")
+
+    filename = Path(object_name).name or f"cover-{order_id}.jpg"
+    suffix = Path(filename).suffix.lower()
+    if suffix in (".jpg", ".jpeg"):
+        media_type = "image/jpeg"
+    elif suffix == ".png":
+        media_type = "image/png"
+    elif suffix == ".webp":
+        media_type = "image/webp"
+    else:
+        media_type = "application/octet-stream"
+
+    return object_name, media_type, filename
+
+
+@router.get(
+    "/digital-books/{order_id}/download/{file_type}",
+    status_code=status.HTTP_200_OK,
+    summary="Download paid order file",
+    description="Stream a purchased file (book PDF or cover image) to the browser. Only the order owner can download.",
+)
+async def download_digital_order_file(
+    order_id: int,
+    file_type: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Serve purchased artifact from object storage."""
+    object_name, media_type, filename = await _resolve_order_file(
+        db=db,
+        order_id=order_id,
+        file_type=file_type,
+        user_id=current_user.id,
+    )
+    storage = StorageService()
+    file_bytes = await storage.download_file(object_name)
+
+    return Response(
+        content=file_bytes,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+        },
+    )
+
+
+@router.get(
+    "/digital-books/{order_id}/download/{file_type}/public",
+    status_code=status.HTTP_200_OK,
+    summary="Download paid order file (token)",
+    description="Stream a purchased file using a short-lived download token.",
+)
+async def download_digital_order_file_public(
+    order_id: int,
+    file_type: str,
+    token: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    """Serve one artifact using a short-lived token in query params."""
+    user_id = _decode_download_token(token=token, order_id=order_id, file_type=file_type)
+    object_name, media_type, filename = await _resolve_order_file(
+        db=db,
+        order_id=order_id,
+        file_type=file_type,
+        user_id=user_id,
+    )
+    storage = StorageService()
+    file_bytes = await storage.download_file(object_name)
+
+    return Response(
+        content=file_bytes,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+        },
+    )

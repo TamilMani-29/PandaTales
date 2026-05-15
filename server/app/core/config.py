@@ -11,8 +11,18 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(
+            "env",
+            "env.development",
+            ".env",
+            ".env.development",
+            "server/.env",
+            "server/.env.development",
+            "../env.development",
+            "../env",
+        ),
         env_file_encoding="utf-8",
+        env_ignore_empty=True,
         case_sensitive=False,
         extra="ignore",
         # Disable JSON schema validation for env vars to allow comma-separated strings
@@ -42,7 +52,7 @@ class Settings(BaseSettings):
     # JWT
     JWT_SECRET_KEY: str = Field(..., min_length=32)
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
     # OAuth - Google
@@ -60,6 +70,7 @@ class Settings(BaseSettings):
     MINIO_BUCKET: str = "pandatales"
     MINIO_SECURE: bool = False
     MINIO_REGION: str = "us-east-1"
+    MINIO_PUBLIC_BASE_URL: str = ""
 
     # AWS S3 (alternative)
     AWS_ACCESS_KEY_ID: str = ""
@@ -84,6 +95,7 @@ class Settings(BaseSettings):
     # Razorpay
     RAZORPAY_KEY_ID: str = ""
     RAZORPAY_KEY_SECRET: str = ""
+    RAZORPAY_VERIFY_SSL: bool = True
 
     # Replicate AI (image generation)
     REPLICATE_API_TOKEN: str = ""
@@ -100,6 +112,11 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM_EMAIL: str = "noreply@pandatales.com"
     SMTP_FROM_NAME: str = "Panda Tales"
+    SELLER_GSTIN: str = "33BEEPN5284A1ZS"
+    GST_INTRA_STATE_BY_DEFAULT: bool = False
+
+    # Local digital order delivery
+    LOCAL_DIGITAL_DELIVERY_DIR: str = "local-deliveries/digital-orders"
 
     # Rate Limiting
     RATE_LIMIT_ENABLED: bool = True

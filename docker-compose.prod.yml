@@ -73,6 +73,15 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET}
+      RAZORPAY_VERIFY_SSL: ${RAZORPAY_VERIFY_SSL:-true}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-noreply@pandatales.com}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Panda Tales}
       REPLICATE_API_TOKEN: ${REPLICATE_API_TOKEN:-}
       
     # Mount only data directory in production
@@ -93,6 +102,9 @@ services:
   frontend:
     container_name: pandatales_frontend_prod
     restart: always
+    build:
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
     # Remove volume mounts in production
     volumes: []
     environment:

@@ -13,7 +13,7 @@ from uuid import UUID
 import razorpay
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
-from sqlalchemy import select
+from sqlalchemy import and_, func, or_, select
 
 from app.common import get_logger
 from app.common.exceptions import BadRequestException, NotFoundException
@@ -178,9 +178,33 @@ class PaymentService:
                 book.is_purchased = True
                 book.purchased_at = datetime.now(timezone.utc)
 
-        # Send invoice to purchaser email (non-blocking in payment confirmation path)
+        user_result = await self.db.execute(select(User).where(User.id == order.user_id))
+        user = user_result.scalar_one_or_none()
+        invoice_number = await self._build_checkout_invoice_number(order)
+
+        # Send tax invoice via Razorpay when gateway credentials are present.
+        if user and user.email:
+            try:
+                await self._create_and_notify_razorpay_invoice(
+                    order=order,
+                    user=user,
+                    invoice_number=invoice_number,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "razorpay_checkout_invoice_failed",
+                    order_id=str(order.id),
+                    user_id=str(user_id),
+                    error=str(exc),
+                )
+
+        # Send custom invoice email with PDF attachment.
         try:
-            await self._send_order_invoice_email(order)
+            await self._send_order_invoice_email(
+                order,
+                user=user,
+                invoice_number=invoice_number,
+            )
         except Exception as exc:
             logger.warning(
                 "checkout_invoice_email_failed",
@@ -246,31 +270,51 @@ class PaymentService:
             whatsapp_number=order.whatsapp_number,
         )
 
-    async def _send_order_invoice_email(self, order: Order) -> None:
+    async def _send_order_invoice_email(
+        self,
+        order: Order,
+        user: User | None = None,
+        invoice_number: str | None = None,
+    ) -> None:
         settings = get_settings()
         if not settings.SMTP_HOST or not settings.SMTP_PORT:
             raise BadRequestException("SMTP is not configured")
         if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
             raise BadRequestException("SMTP credentials are missing")
 
-        user_result = await self.db.execute(select(User).where(User.id == order.user_id))
-        user = user_result.scalar_one_or_none()
+        if user is None:
+            user_result = await self.db.execute(select(User).where(User.id == order.user_id))
+            user = user_result.scalar_one_or_none()
         if not user or not user.email:
             return
 
         gst_rate_percent = GST_RATES_BY_FORMAT.get(order.format, 0)
         taxable_amount = self._derive_taxable_from_total(order.amount, gst_rate_percent)
         gst_amount = max(order.amount - taxable_amount, 0)
-        invoice_number = f"INV-CHK-{str(order.id)[:8]}-{datetime.now(timezone.utc):%Y%m%d}"
+        if not invoice_number:
+            invoice_number = await self._build_checkout_invoice_number(order)
+
+        hsn_sac_code = self._hsn_sac_for_format(order.format)
+        is_intra_state = self._is_intra_state_supply()
+        igst_amount, cgst_amount, sgst_amount = self._split_gst_components(
+            gst_amount,
+            is_intra_state=is_intra_state,
+        )
+        phone = (user.phone or "").strip()
 
         invoice_pdf = self._build_invoice_pdf_bytes(
             invoice_number=invoice_number,
             order=order,
             customer_name=user.full_name or user.first_name,
             customer_email=user.email,
+            customer_phone=phone,
             taxable_amount_paise=taxable_amount,
             gst_rate_percent=gst_rate_percent,
             gst_amount_paise=gst_amount,
+            igst_amount_paise=igst_amount,
+            cgst_amount_paise=cgst_amount,
+            sgst_amount_paise=sgst_amount,
+            hsn_sac_code=hsn_sac_code,
             total_amount_paise=order.amount,
         )
 
@@ -279,10 +323,20 @@ class PaymentService:
         message["From"] = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_FROM_EMAIL}>"
         message["To"] = user.email
         message.set_content(
-            "Hi,\n\n"
+            f"Hi {user.full_name or user.first_name or 'Customer'},\n\n"
             "Thanks for your order with Panda Tales.\n"
-            "Please find your invoice attached.\n"
-            "This invoice includes GST details (including 0% GST for exempt physical books).\n\n"
+            "Please find your GST invoice attached.\n\n"
+            f"Invoice Number: {invoice_number}\n"
+            f"Customer Name: {user.full_name or user.first_name or 'Customer'}\n"
+            f"Customer Email: {user.email}\n"
+            f"Customer Phone: {phone or 'Unavailable'}\n"
+            f"HSN/SAC: {hsn_sac_code}\n"
+            f"Taxable Amount: INR {taxable_amount / 100:.2f}\n"
+            f"GST ({gst_rate_percent}%): INR {gst_amount / 100:.2f}\n"
+            f"IGST: INR {igst_amount / 100:.2f}\n"
+            f"CGST: INR {cgst_amount / 100:.2f}\n"
+            f"SGST: INR {sgst_amount / 100:.2f}\n"
+            f"Grand Total: INR {order.amount / 100:.2f}\n\n"
             "Regards,\n"
             "Panda Tales"
         )
@@ -307,6 +361,128 @@ class PaymentService:
         except Exception as exc:
             raise BadRequestException("Failed to send invoice email") from exc
 
+    async def _create_and_notify_razorpay_invoice(
+        self,
+        *,
+        order: Order,
+        user: User,
+        invoice_number: str,
+    ) -> None:
+        if not self._client:
+            return
+
+        gst_rate_percent = GST_RATES_BY_FORMAT.get(order.format, 0)
+        taxable_amount = self._derive_taxable_from_total(order.amount, gst_rate_percent)
+        gst_amount = max(order.amount - taxable_amount, 0)
+        hsn_sac_code = self._hsn_sac_for_format(order.format)
+        is_intra_state = self._is_intra_state_supply()
+        igst_amount, cgst_amount, sgst_amount = self._split_gst_components(
+            gst_amount,
+            is_intra_state=is_intra_state,
+        )
+
+        customer_contact = self._normalize_contact_number(user.phone)
+        invoice_payload: dict = {
+            "type": "invoice",
+            "draft": 0,
+            "currency": "INR",
+            "receipt": invoice_number,
+            "description": f"Checkout order #{order.id}",
+            "customer": {
+                "name": (user.full_name or user.first_name or "Customer").strip() or "Customer",
+                "email": user.email,
+                "contact": customer_contact,
+            },
+            "line_items": [
+                {
+                    "name": f"{order.format.title()} book purchase",
+                    "description": "Taxable amount",
+                    "amount": taxable_amount,
+                    "currency": "INR",
+                    "quantity": 1,
+                    "hsn_code": hsn_sac_code,
+                },
+                {
+                    "name": f"GST @{gst_rate_percent}%",
+                    "description": "GST component",
+                    "amount": gst_amount,
+                    "currency": "INR",
+                    "quantity": 1,
+                    "hsn_code": hsn_sac_code,
+                },
+            ],
+            "email_notify": 1,
+            "sms_notify": 0,
+            "notes": {
+                "order_id": str(order.id),
+                "payment_id": order.razorpay_payment_id or "",
+                "seller_gstin": get_settings().SELLER_GSTIN,
+                "customer_name": user.full_name or user.first_name or "Customer",
+                "customer_email": user.email,
+                "customer_phone": user.phone or "",
+                "hsn_sac": hsn_sac_code,
+                "taxable_amount_inr": f"{taxable_amount / 100:.2f}",
+                "gst_rate_percent": str(gst_rate_percent),
+                "gst_amount_inr": f"{gst_amount / 100:.2f}",
+                "igst_inr": f"{igst_amount / 100:.2f}",
+                "cgst_inr": f"{cgst_amount / 100:.2f}",
+                "sgst_inr": f"{sgst_amount / 100:.2f}",
+                "total_amount_inr": f"{order.amount / 100:.2f}",
+            },
+        }
+
+        if not customer_contact:
+            invoice_payload["customer"].pop("contact", None)
+
+        rz_invoice = await asyncio.to_thread(self._client.invoice.create, invoice_payload)
+        invoice_id = rz_invoice.get("id")
+        if invoice_id:
+            await asyncio.to_thread(self._client.invoice.notify_by, invoice_id, "email")
+
+    @staticmethod
+    def _normalize_contact_number(phone: str | None) -> str:
+        if not phone:
+            return ""
+        digits = "".join(ch for ch in str(phone) if ch.isdigit())
+        if len(digits) < 10:
+            return ""
+        return digits[-15:]
+
+    @staticmethod
+    def _split_gst_components(gst_amount_paise: int, *, is_intra_state: bool) -> tuple[int, int, int]:
+        if gst_amount_paise <= 0:
+            return 0, 0, 0
+        if not is_intra_state:
+            return gst_amount_paise, 0, 0
+        cgst = gst_amount_paise // 2
+        sgst = gst_amount_paise - cgst
+        return 0, cgst, sgst
+
+    @staticmethod
+    def _hsn_sac_for_format(order_format: str) -> str:
+        if order_format == "digital":
+            return "99843"
+        return "4901"
+
+    @staticmethod
+    def _is_intra_state_supply() -> bool:
+        return bool(get_settings().GST_INTRA_STATE_BY_DEFAULT)
+
+    async def _build_checkout_invoice_number(self, order: Order) -> str:
+        paid_at = order.paid_at or datetime.now(timezone.utc)
+        invoice_date = paid_at.date()
+
+        seq_query = select(func.count(Order.id)).where(
+            Order.paid_at.is_not(None),
+            func.date(Order.paid_at) == invoice_date,
+            or_(
+                Order.paid_at < paid_at,
+                and_(Order.paid_at == paid_at, Order.id <= order.id),
+            ),
+        )
+        sequence = (await self.db.scalar(seq_query)) or 1
+        return f"INV-{invoice_date:%Y}-{int(sequence):06d}"
+
     def _build_invoice_pdf_bytes(
         self,
         *,
@@ -314,9 +490,14 @@ class PaymentService:
         order: Order,
         customer_name: str,
         customer_email: str,
+        customer_phone: str,
         taxable_amount_paise: int,
         gst_rate_percent: int,
         gst_amount_paise: int,
+        igst_amount_paise: int,
+        cgst_amount_paise: int,
+        sgst_amount_paise: int,
+        hsn_sac_code: str,
         total_amount_paise: int,
     ) -> bytes:
         settings = get_settings()
@@ -325,69 +506,120 @@ class PaymentService:
         pdf = canvas.Canvas(buffer, pagesize=A4)
 
         left = 50
+        right = page_w - 50
         y = page_h - 50
-        pdf.setFont("Helvetica-Bold", 18)
+
+        pdf.setFont("Helvetica-Bold", 20)
         pdf.drawString(left, y, "TAX INVOICE")
-
-        y -= 24
-        pdf.setFont("Helvetica", 10)
-        pdf.drawString(left, y, f"Seller: {settings.SMTP_FROM_NAME}")
-        y -= 14
-        pdf.drawString(left, y, f"Invoice No: {invoice_number}")
-        y -= 14
-        pdf.drawString(left, y, f"Order ID: {order.id}")
-        y -= 14
-        pdf.drawString(left, y, f"Invoice Date: {datetime.now(timezone.utc):%Y-%m-%d %H:%M UTC}")
-        y -= 14
-        if order.paid_at:
-            pdf.drawString(left, y, f"Paid At: {order.paid_at:%Y-%m-%d %H:%M UTC}")
-            y -= 14
-        if order.razorpay_payment_id:
-            pdf.drawString(left, y, f"Payment ID: {order.razorpay_payment_id}")
-            y -= 14
-
-        y -= 6
-        pdf.setFont("Helvetica-Bold", 11)
-        pdf.drawString(left, y, "Bill To")
-        y -= 16
-        pdf.setFont("Helvetica", 10)
-        pdf.drawString(left, y, customer_name or "Customer")
-        y -= 14
-        pdf.drawString(left, y, customer_email)
-
-        y -= 24
-        pdf.setFont("Helvetica-Bold", 10)
-        pdf.drawString(left, y, "Item")
-        pdf.drawString(left + 260, y, "Taxable")
-        pdf.drawString(left + 350, y, "GST")
-        pdf.drawString(left + 430, y, "Total")
-        y -= 10
-        pdf.line(left, y, page_w - left, y)
-
-        y -= 18
-        pdf.setFont("Helvetica", 10)
-        item_name = f"{order.format.title()} book purchase"
-        pdf.drawString(left, y, item_name)
-        pdf.drawRightString(left + 330, y, f"INR {taxable_amount_paise / 100:.2f}")
-        pdf.drawRightString(left + 420, y, f"{gst_rate_percent}%")
-        pdf.drawRightString(page_w - left, y, f"INR {total_amount_paise / 100:.2f}")
-
-        y -= 14
-        pdf.drawString(left, y, f"GST Amount: INR {gst_amount_paise / 100:.2f}")
-        y -= 20
-        pdf.line(left, y, page_w - left, y)
-        y -= 18
-        pdf.setFont("Helvetica-Bold", 11)
-        pdf.drawString(left, y, "Grand Total")
-        pdf.drawRightString(page_w - left, y, f"INR {total_amount_paise / 100:.2f}")
-
-        y -= 20
         pdf.setFont("Helvetica", 9)
-        pdf.drawString(
-            left,
-            y,
-            "GST summary: Digital products 18%, physical books 0% (exempt).",
-        )
+        pdf.drawString(left, y - 14, "Panda Tales")
+
+        meta_x = right - 230
+        meta_top = y + 8
+        meta_bottom = y - 72
+        pdf.rect(meta_x, meta_bottom, 230, meta_top - meta_bottom)
+        pdf.setFont("Helvetica", 9)
+        pdf.drawString(meta_x + 10, meta_top - 14, f"Invoice No: {invoice_number}")
+        pdf.drawString(meta_x + 10, meta_top - 28, f"Invoice Date: {datetime.now(timezone.utc):%Y-%m-%d %H:%M UTC}")
+        pdf.drawString(meta_x + 10, meta_top - 42, f"Order ID: {order.id}")
+        if order.razorpay_payment_id:
+            pdf.drawString(meta_x + 10, meta_top - 56, f"Payment ID: {order.razorpay_payment_id}")
+        elif order.paid_at:
+            pdf.drawString(meta_x + 10, meta_top - 56, f"Paid At: {order.paid_at:%Y-%m-%d %H:%M UTC}")
+
+        y = meta_bottom - 16
+        box_h = 68
+        gap = 12
+        half_w = (right - left - gap) / 2
+
+        pdf.rect(left, y - box_h, half_w, box_h)
+        pdf.rect(left + half_w + gap, y - box_h, half_w, box_h)
+
+        pdf.setFont("Helvetica-Bold", 10)
+        pdf.drawString(left + 8, y - 14, "Bill To")
+        pdf.drawString(left + half_w + gap + 8, y - 14, "Seller")
+
+        pdf.setFont("Helvetica", 9)
+        pdf.drawString(left + 8, y - 30, customer_name or "Customer")
+        pdf.drawString(left + 8, y - 44, customer_email)
+        pdf.drawString(left + 8, y - 58, customer_phone or "Unavailable")
+
+        pdf.drawString(left + half_w + gap + 8, y - 30, settings.SMTP_FROM_NAME)
+        pdf.drawString(left + half_w + gap + 8, y - 44, f"GSTIN: {settings.SELLER_GSTIN}")
+        pdf.drawString(left + half_w + gap + 8, y - 58, "Country: India")
+
+        y -= box_h + 20
+
+        table_top = y
+        row_h = 20
+        table_rows = 2
+        table_h = row_h * table_rows
+        col_widths = [26, 184, 66, 80, 44, 70, 76]
+        table_w = sum(col_widths)
+
+        pdf.rect(left, table_top - table_h, table_w, table_h)
+
+        x = left
+        for w in col_widths[:-1]:
+            x += w
+            pdf.line(x, table_top, x, table_top - table_h)
+
+        pdf.line(left, table_top - row_h, left + table_w, table_top - row_h)
+
+        pdf.setFillColorRGB(0.95, 0.95, 0.95)
+        pdf.rect(left, table_top - row_h, table_w, row_h, fill=1, stroke=0)
+        pdf.setFillColorRGB(0, 0, 0)
+
+        headers = ["#", "Description", "HSN/SAC", "Taxable", "GST %", "GST Amt", "Total"]
+        x = left
+        pdf.setFont("Helvetica-Bold", 9)
+        for idx, title in enumerate(headers):
+            align_right = idx in (3, 5, 6)
+            if align_right:
+                pdf.drawRightString(x + col_widths[idx] - 4, table_top - 14, title)
+            else:
+                pdf.drawString(x + 4, table_top - 14, title)
+            x += col_widths[idx]
+
+        item_name = f"{order.format.title()} book purchase"
+        values = [
+            "1",
+            item_name,
+            hsn_sac_code,
+            f"INR {taxable_amount_paise / 100:.2f}",
+            f"{gst_rate_percent}%",
+            f"INR {gst_amount_paise / 100:.2f}",
+            f"INR {total_amount_paise / 100:.2f}",
+        ]
+
+        x = left
+        pdf.setFont("Helvetica", 9)
+        for idx, value in enumerate(values):
+            align_right = idx in (3, 5, 6)
+            if align_right:
+                pdf.drawRightString(x + col_widths[idx] - 4, table_top - row_h - 14, value)
+            else:
+                pdf.drawString(x + 4, table_top - row_h - 14, value)
+            x += col_widths[idx]
+
+        y = table_top - table_h - 16
+
+        summary_w = 230
+        summary_h = 92
+        summary_x = right - summary_w
+        pdf.rect(summary_x, y - summary_h, summary_w, summary_h)
+        pdf.setFont("Helvetica-Bold", 10)
+        pdf.drawString(summary_x + 8, y - 14, "Tax Summary")
+        pdf.setFont("Helvetica", 9)
+        pdf.drawString(summary_x + 8, y - 30, f"IGST: INR {igst_amount_paise / 100:.2f}")
+        pdf.drawString(summary_x + 8, y - 44, f"CGST: INR {cgst_amount_paise / 100:.2f}")
+        pdf.drawString(summary_x + 8, y - 58, f"SGST: INR {sgst_amount_paise / 100:.2f}")
+        pdf.setFont("Helvetica-Bold", 10)
+        pdf.drawString(summary_x + 8, y - 78, "Grand Total")
+        pdf.drawRightString(summary_x + summary_w - 8, y - 78, f"INR {total_amount_paise / 100:.2f}")
+
+        pdf.setFont("Helvetica", 8)
+        pdf.drawString(left, y - summary_h - 14, "GST summary: Digital products 18%, physical books 0% (exempt).")
 
         pdf.showPage()
         pdf.save()

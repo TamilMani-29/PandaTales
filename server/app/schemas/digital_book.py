@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 
 class DigitalBookCreateRequest(BaseModel):
@@ -145,7 +145,7 @@ class DigitalBookPurchaseRequest(BaseModel):
     """Payload for digital book purchase."""
 
     book_id: int = Field(..., ge=1)
-    delivery_method: str = Field(..., pattern="^(email|whatsapp)$")
+    delivery_method: str = Field("local", pattern="^(local|email|whatsapp)$")
     delivery_contact: str = Field(..., min_length=3, max_length=120)
 
 
@@ -153,7 +153,7 @@ class DigitalBookPaymentCreateRequest(BaseModel):
     """Payload to start checkout and create a Razorpay order for digital book."""
 
     book_id: int = Field(..., ge=1)
-    delivery_method: str = Field(..., pattern="^(email|whatsapp)$")
+    delivery_method: str = Field("local", pattern="^(local|email|whatsapp)$")
     delivery_contact: str = Field(..., min_length=3, max_length=120)
 
 
@@ -225,9 +225,3 @@ class DigitalBookListResponse(BaseModel):
 
     books: list[DigitalBookResponse]
 
-
-class SendPdfEmailRequest(BaseModel):
-    """Request model to email a book PDF to a user."""
-
-    book_id: int = Field(..., ge=1)
-    email: EmailStr

@@ -12,7 +12,6 @@ from app.schemas.digital_book import (
     BookCategoryCreateRequest,
     DigitalBookCreateRequest,
     DigitalBookUpdateRequest,
-    SendPdfEmailRequest,
 )
 from app.services.digital_book import DigitalBookService
 
@@ -352,26 +351,5 @@ async def get_digital_book_preview_pdf(book_id: int, db: AsyncSession = Depends(
     service = DigitalBookService(db)
     data = await service.get_watermarked_preview(book_id)
     return success_response(data=data, message="Digital book preview generated successfully")
-
-
-@router.post(
-    "/send-pdf-email",
-    response_model=dict[str, Any],
-    status_code=status.HTTP_200_OK,
-    summary="Send book PDF to email",
-    description="Send selected book's PDF as an email attachment to provided email address.",
-)
-async def send_book_pdf_to_email(
-    request: SendPdfEmailRequest,
-    db: AsyncSession = Depends(get_db),
-) -> dict[str, Any]:
-    """Send book PDF to the requested email address."""
-    service = DigitalBookService(db)
-    await service.send_pdf_to_email(book_id=request.book_id, recipient_email=str(request.email))
-
-    return success_response(
-        data={"book_id": request.book_id, "email": str(request.email)},
-        message="Successfully email sent",
-    )
 
 

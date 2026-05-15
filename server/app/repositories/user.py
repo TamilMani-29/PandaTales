@@ -46,6 +46,29 @@ class UserRepository:
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
+    async def get_by_email_or_username(
+        self,
+        identifier: str,
+        include_inactive: bool = False,
+    ) -> User | None:
+        """Get user by email or username (email local-part)."""
+        normalized = identifier.strip().lower()
+        if not normalized:
+            return None
+
+        query = select(User)
+        if "@" in normalized:
+            query = query.where(User.email == normalized)
+        else:
+            query = query.where(User.email.ilike(f"{normalized}@%"))
+
+        if not include_inactive:
+            query = query.where(User.is_active == True)
+
+        query = query.order_by(User.created_at.asc())
+        result = await self.db.execute(query)
+        return result.scalars().first()
+
     async def get_by_referral_code(self, referral_code: str) -> User | None:
         """Get active user by referral code."""
         query = select(User).where(
@@ -95,6 +118,7 @@ class UserRepository:
         first_name: str,
         last_name: str,
         full_name: str,
+        phone: str | None = None,
     ) -> User:
         """Create a user for email/password signup."""
         user = User(
@@ -103,6 +127,7 @@ class UserRepository:
             first_name=first_name,
             last_name=last_name,
             full_name=full_name,
+            phone=phone,
             referral_code=await self._generate_referral_code(),
             referral_count=0,
         )

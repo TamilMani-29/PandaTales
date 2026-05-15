@@ -191,6 +191,11 @@ export default function AdminPage() {
     language: ["english"],
     genre: ["fantasy"],
   });
+  const [optionsModalOpen, setOptionsModalOpen] = useState(false);
+  const [optionsAddingType, setOptionsAddingType] = useState(null);
+  const [optionsNewValue, setOptionsNewValue] = useState("");
+  const [optionsSaving, setOptionsSaving] = useState(false);
+  const [optionsMsg, setOptionsMsg] = useState("");
 
   const [actionMsg, setActionMsg] = useState("");
   const [bookModalMsg, setBookModalMsg] = useState("");
@@ -508,42 +513,41 @@ export default function AdminPage() {
     }
   }
 
-  async function addBookAttributeOption(optionType) {
-    const raw = window.prompt(`Add new ${titleCase(optionType)} value`);
-    const value = String(raw || "").trim().toLowerCase();
-    if (!value) return;
-    setSaving(true);
-    setActionMsg("");
+  async function addBookAttributeOption(optionType, value) {
+    const v = String(value || "").trim().toLowerCase();
+    if (!v) return;
+    setOptionsSaving(true);
+    setOptionsMsg("");
     try {
-      await createDigitalBookAttributeOption({ option_type: optionType, value });
-      setActionMsg(`✅ ${titleCase(optionType)} option added`);
+      await createDigitalBookAttributeOption({ option_type: optionType, value: v });
+      setOptionsMsg(`✅ Added "${v}" to ${titleCase(optionType)}`);
       await loadCatalog();
-      setBookForm((s) => ({ ...s, [optionType]: value }));
+      setOptionsNewValue("");
     } catch (err) {
-      setActionMsg("❌ " + (err?.message || `Failed to add ${optionType}`));
+      setOptionsMsg("❌ " + (err?.message || `Failed to add ${optionType}`));
     } finally {
-      setSaving(false);
+      setOptionsSaving(false);
     }
   }
 
-  async function deleteBookAttributeOption(optionType) {
-    const current = String(bookForm?.[optionType] || "").trim().toLowerCase();
-    if (!current) {
-      setActionMsg(`❌ Select a ${optionType} value to delete`);
-      return;
-    }
-    if (!window.confirm(`Delete ${titleCase(optionType)} option "${current}"?`)) return;
-    setSaving(true);
-    setActionMsg("");
+  async function deleteBookAttributeOption(optionType, value) {
+    if (!value) return;
+    setOptionsSaving(true);
+    setOptionsMsg("");
     try {
-      await deleteDigitalBookAttributeOption(optionType, current);
-      setActionMsg(`✅ ${titleCase(optionType)} option deleted`);
+      await deleteDigitalBookAttributeOption(optionType, value);
+      setOptionsMsg(`✅ Removed "${value}" from ${titleCase(optionType)}`);
       await loadCatalog();
-      setBookForm((s) => ({ ...s, [optionType]: getDefaultOption(optionType, "") }));
+      // Reset book form field if it was using the deleted value
+      setBookForm((s) => {
+        const field = optionType;
+        const remaining = (bookAttributeOptions[field] || []).filter((v) => v !== value);
+        return { ...s, [field]: remaining[0] || "" };
+      });
     } catch (err) {
-      setActionMsg("❌ " + (err?.message || `Failed to delete ${optionType}`));
+      setOptionsMsg("❌ " + (err?.message || `Failed to delete ${optionType}: might be in use by books`));
     } finally {
-      setSaving(false);
+      setOptionsSaving(false);
     }
   }
 
@@ -1040,45 +1044,32 @@ export default function AdminPage() {
                 <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Description</label>
                 <textarea style={{ ...inputStyle, minHeight: 60 }} placeholder="Description..." value={bookForm.description} onChange={(e) => setBookForm((s) => ({ ...s, description: e.target.value }))} />
               </div>
+              <div style={{ gridColumn: "1/-1", display: "flex", justifyContent: "flex-end" }}>
+                <button type="button" style={{ ...button, background: "#F5F3FF", color: "#5b4f7c", border: "1px solid #DDD6FE", padding: "8px 16px", borderRadius: 10, fontSize: 13, fontWeight: 700 }} onClick={() => { setOptionsMsg(""); setOptionsModalOpen(true); }}>⚙️ Manage Dropdown Options</button>
+              </div>
               <div style={{ display: "grid", gap: 6 }}>
                 <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Book Type</label>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 6 }}>
-                  <select style={inputStyle} value={bookForm.book_type} onChange={(e) => setBookForm((s) => ({ ...s, book_type: e.target.value }))}>
-                    {(bookAttributeOptions.book_type || []).map((value) => <option key={value} value={value}>{titleCase(value)}</option>)}
-                  </select>
-                  <button type="button" style={{ ...button, background: "#ECFEFF", color: "#0e7490", padding: "10px 12px", borderRadius: 12 }} onClick={() => addBookAttributeOption("book_type")}>+ Add</button>
-                  <button type="button" style={{ ...button, background: "#FEF2F2", color: "#b91c1c", padding: "10px 12px", borderRadius: 12 }} onClick={() => deleteBookAttributeOption("book_type")}>Delete</button>
-                </div>
+                <select style={inputStyle} value={bookForm.book_type} onChange={(e) => setBookForm((s) => ({ ...s, book_type: e.target.value }))}>
+                  {(bookAttributeOptions.book_type || []).map((value) => <option key={value} value={value}>{titleCase(value)}</option>)}
+                </select>
               </div>
               <div style={{ display: "grid", gap: 6 }}>
                 <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Genre</label>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 6 }}>
-                  <select style={inputStyle} value={bookForm.genre} onChange={(e) => setBookForm((s) => ({ ...s, genre: e.target.value }))}>
-                    {(bookAttributeOptions.genre || []).map((value) => <option key={value} value={value}>{titleCase(value)}</option>)}
-                  </select>
-                  <button type="button" style={{ ...button, background: "#ECFEFF", color: "#0e7490", padding: "10px 12px", borderRadius: 12 }} onClick={() => addBookAttributeOption("genre")}>+ Add</button>
-                  <button type="button" style={{ ...button, background: "#FEF2F2", color: "#b91c1c", padding: "10px 12px", borderRadius: 12 }} onClick={() => deleteBookAttributeOption("genre")}>Delete</button>
-                </div>
+                <select style={inputStyle} value={bookForm.genre} onChange={(e) => setBookForm((s) => ({ ...s, genre: e.target.value }))}>
+                  {(bookAttributeOptions.genre || []).map((value) => <option key={value} value={value}>{titleCase(value)}</option>)}
+                </select>
               </div>
               <div style={{ display: "grid", gap: 6 }}>
                 <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Theme</label>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 6 }}>
-                  <select style={inputStyle} value={bookForm.theme} onChange={(e) => setBookForm((s) => ({ ...s, theme: e.target.value }))}>
-                    {(bookAttributeOptions.theme || []).map((value) => <option key={value} value={value}>{titleCase(value)}</option>)}
-                  </select>
-                  <button type="button" style={{ ...button, background: "#ECFEFF", color: "#0e7490", padding: "10px 12px", borderRadius: 12 }} onClick={() => addBookAttributeOption("theme")}>+ Add</button>
-                  <button type="button" style={{ ...button, background: "#FEF2F2", color: "#b91c1c", padding: "10px 12px", borderRadius: 12 }} onClick={() => deleteBookAttributeOption("theme")}>Delete</button>
-                </div>
+                <select style={inputStyle} value={bookForm.theme} onChange={(e) => setBookForm((s) => ({ ...s, theme: e.target.value }))}>
+                  {(bookAttributeOptions.theme || []).map((value) => <option key={value} value={value}>{titleCase(value)}</option>)}
+                </select>
               </div>
               <div style={{ display: "grid", gap: 6 }}>
                 <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Language</label>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 6 }}>
-                  <select style={inputStyle} value={bookForm.language} onChange={(e) => setBookForm((s) => ({ ...s, language: e.target.value }))}>
-                    {(bookAttributeOptions.language || []).map((value) => <option key={value} value={value}>{titleCase(value)}</option>)}
-                  </select>
-                  <button type="button" style={{ ...button, background: "#ECFEFF", color: "#0e7490", padding: "10px 12px", borderRadius: 12 }} onClick={() => addBookAttributeOption("language")}>+ Add</button>
-                  <button type="button" style={{ ...button, background: "#FEF2F2", color: "#b91c1c", padding: "10px 12px", borderRadius: 12 }} onClick={() => deleteBookAttributeOption("language")}>Delete</button>
-                </div>
+                <select style={inputStyle} value={bookForm.language} onChange={(e) => setBookForm((s) => ({ ...s, language: e.target.value }))}>
+                  {(bookAttributeOptions.language || []).map((value) => <option key={value} value={value}>{titleCase(value)}</option>)}
+                </select>
               </div>
               <div style={{ display: "grid", gap: 6 }}>
                 <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Category (by ID)</label>
@@ -1160,6 +1151,60 @@ export default function AdminPage() {
               <button type="button" style={{ ...button, background: "#e5e7eb", color: "#374151", padding: "11px 18px" }} onClick={() => setBookModalOpen(false)}>Cancel</button>
             </div>
           </form>
+        </AdminModal>
+      ) : null}
+
+      {optionsModalOpen ? (
+        <AdminModal title="⚙️ Manage Dropdown Options" onClose={() => { setOptionsModalOpen(false); setOptionsMsg(""); setOptionsAddingType(null); setOptionsNewValue(""); }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+            {optionsMsg && (
+              <div style={{ padding: "8px 14px", borderRadius: 10, background: optionsMsg.startsWith("✅") ? "#F0FDF4" : "#FEF2F2", color: optionsMsg.startsWith("✅") ? "#166534" : "#b91c1c", fontWeight: 600, fontSize: 13 }}>{optionsMsg}</div>
+            )}
+            {[["book_type", "📘 Book Type"], ["genre", "🎭 Genre"], ["theme", "🎨 Theme"], ["language", "🌐 Language"]].map(([type, label]) => (
+              <div key={type} style={{ background: "#FAFAFA", borderRadius: 14, padding: "16px 18px", border: "1px solid #E5E7EB" }}>
+                <div style={{ fontWeight: 700, color: "#374151", fontSize: 14, marginBottom: 10 }}>{label}</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+                  {(bookAttributeOptions[type] || []).map((val) => (
+                    <span key={val} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#EDE9FE", color: "#5b21b6", borderRadius: 999, padding: "4px 12px", fontSize: 13, fontWeight: 600 }}>
+                      {titleCase(val)}
+                      <button
+                        type="button"
+                        title={`Remove "${val}"`}
+                        disabled={optionsSaving}
+                        onClick={() => deleteBookAttributeOption(type, val)}
+                        style={{ background: "none", border: "none", color: "#7c3aed", cursor: "pointer", fontWeight: 900, fontSize: 15, lineHeight: 1, padding: "0 2px", opacity: optionsSaving ? 0.4 : 1 }}
+                      >×</button>
+                    </span>
+                  ))}
+                  {(bookAttributeOptions[type] || []).length === 0 && (
+                    <span style={{ fontSize: 12, color: "#9CA3AF", fontStyle: "italic" }}>No options yet</span>
+                  )}
+                </div>
+                {optionsAddingType === type ? (
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <input
+                      autoFocus
+                      style={{ ...inputStyle, flex: 1, padding: "7px 12px", fontSize: 13 }}
+                      placeholder={`New ${titleCase(type)} value…`}
+                      value={optionsNewValue}
+                      onChange={(e) => setOptionsNewValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") { e.preventDefault(); addBookAttributeOption(type, optionsNewValue); setOptionsAddingType(null); }
+                        if (e.key === "Escape") { setOptionsAddingType(null); setOptionsNewValue(""); }
+                      }}
+                    />
+                    <button type="button" disabled={optionsSaving || !optionsNewValue.trim()} style={{ ...button, background: "#7c3aed", color: "#fff", padding: "7px 14px", fontSize: 13, opacity: (!optionsNewValue.trim() || optionsSaving) ? 0.5 : 1 }} onClick={() => { addBookAttributeOption(type, optionsNewValue); setOptionsAddingType(null); }}>Add</button>
+                    <button type="button" style={{ ...button, background: "#F3F4F6", color: "#6B7280", padding: "7px 12px", fontSize: 13 }} onClick={() => { setOptionsAddingType(null); setOptionsNewValue(""); }}>Cancel</button>
+                  </div>
+                ) : (
+                  <button type="button" disabled={optionsSaving} style={{ ...button, background: "#F5F3FF", color: "#7c3aed", border: "1px dashed #C4B5FD", padding: "6px 14px", fontSize: 13, fontWeight: 700, borderRadius: 10 }} onClick={() => { setOptionsAddingType(type); setOptionsNewValue(""); }}>+ Add option</button>
+                )}
+              </div>
+            ))}
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button type="button" style={{ ...button, background: "#E5E7EB", color: "#374151", padding: "9px 22px" }} onClick={() => { setOptionsModalOpen(false); setOptionsMsg(""); setOptionsAddingType(null); setOptionsNewValue(""); }}>Done</button>
+            </div>
+          </div>
         </AdminModal>
       ) : null}
     </div>

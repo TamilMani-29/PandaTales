@@ -337,6 +337,14 @@ class StorageService:
                 message="Failed to generate file URL"
             )
 
+    def get_public_file_url(self, object_name: str) -> str | None:
+        """Build a browser-accessible object URL when public base URL is configured."""
+        public_base = (settings.MINIO_PUBLIC_BASE_URL or "").strip().rstrip("/")
+        if not public_base or not object_name:
+            return None
+        object_path = str(object_name).lstrip("/")
+        return f"{public_base}/{self.bucket}/{object_path}"
+
     async def download_file(self, object_name: str) -> bytes:
         """
         Download file content from MinIO

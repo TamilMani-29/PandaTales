@@ -48,6 +48,7 @@ class AuthService:
         name_parts = [part for part in full_name.split(" ") if part]
         first_name = name_parts[0]
         last_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else "-"
+        normalized_phone = payload.phone
 
         user = await self.repository.create_from_signup(
             email=email,
@@ -55,6 +56,7 @@ class AuthService:
             first_name=first_name,
             last_name=last_name,
             full_name=full_name,
+            phone=normalized_phone,
         )
 
         if referrer is not None:
@@ -79,11 +81,22 @@ class AuthService:
     async def login(self, payload: LoginRequest) -> AuthResponse:
         """Authenticate user and return JWT."""
         user = await self.repository.get_by_email(payload.email.strip().lower(), include_inactive=True)
-        if not user or not user.is_active:
-            raise UnauthorizedException(message="Invalid email or password", error_code="INVALID_CREDENTIALS")
+        if not user:
+            raise UnauthorizedException(
+                message="User does not exist. Please sign up first.",
+                error_code="USER_NOT_FOUND",
+            )
+        if not user.is_active:
+            raise UnauthorizedException(
+                message="User account is inactive.",
+                error_code="USER_INACTIVE",
+            )
 
         if not verify_password(payload.password, user.password_hash):
-            raise UnauthorizedException(message="Invalid email or password", error_code="INVALID_CREDENTIALS")
+            raise UnauthorizedException(
+                message="Invalid password.",
+                error_code="INVALID_PASSWORD",
+            )
 
         await self.repository.update_last_login(user.id)
         token = create_access_token(user.id)
@@ -99,6 +112,7 @@ class AuthService:
             id=str(user.id),
             email=user.email,
             full_name=display_name,
+            phone=user.phone,
             referral_code=user.referral_code,
             referral_count=user.referral_count,
         )

@@ -61,6 +61,7 @@ async def me(current_user: User = Depends(get_current_user)) -> dict[str, Any]:
             "id": str(current_user.id),
             "email": current_user.email,
             "full_name": full_name,
+            "phone": current_user.phone,
             "referral_code": current_user.referral_code,
             "referral_count": current_user.referral_count,
         },
