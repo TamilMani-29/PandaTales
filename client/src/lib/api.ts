@@ -1,12 +1,26 @@
 // In dev: use relative URL so Vite proxy forwards /api → http://localhost:8004
 // In prod: set VITE_API_BASE_URL to your backend URL
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "").trim().replace(/\/+$/, "");
 
 const TOKEN_KEY = "pandatales_access_token";
 const ADMIN_USERNAME = "admin@123";
 const ADMIN_PASSWORD = "admin@123";
 
-export const buildApiUrl = (path: string) => `${API_BASE_URL}${path}`;
+function joinApiUrl(path: string): string {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  if (!API_BASE_URL) {
+    return normalizedPath;
+  }
+
+  // Avoid duplicate prefix when both base and path contain /api.
+  if (API_BASE_URL.endsWith("/api") && normalizedPath.startsWith("/api/")) {
+    return `${API_BASE_URL}${normalizedPath.slice(4)}`;
+  }
+
+  return `${API_BASE_URL}${normalizedPath}`;
+}
+
+export const buildApiUrl = (path: string) => joinApiUrl(path);
 
 export const getToken = () => localStorage.getItem(TOKEN_KEY);
 export const setToken = (token: string) => localStorage.setItem(TOKEN_KEY, token);
@@ -49,7 +63,7 @@ async function request<T>(
     headers.Authorization = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(buildApiUrl(path), {
     ...options,
     headers,
   });
@@ -272,7 +286,7 @@ export async function downloadOrderFile(
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/v1/payments/digital-books/${orderId}/download/${fileType}`,
+        buildApiUrl(`/api/v1/payments/digital-books/${orderId}/download/${fileType}`),
         { headers: token ? { Authorization: `Bearer ${token}` } : {} }
       );
       if (!response.ok) {
