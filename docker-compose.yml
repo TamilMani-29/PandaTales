@@ -96,7 +96,7 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
       MINIO_BUCKET: ${MINIO_BUCKET:-pandatales}
       MINIO_SECURE: "false"
-      MINIO_PUBLIC_BASE_URL: ${MINIO_PUBLIC_BASE_URL:-http://localhost:9000}
+      MINIO_PUBLIC_BASE_URL: ${MINIO_PUBLIC_BASE_URL:-/minio}
       
       # JWT
       SECRET_KEY: ${SECRET_KEY:-dev_secret_key_at_least_32_characters_long_12345}
@@ -159,16 +159,31 @@ services:
       dockerfile: Dockerfile
       target: runner
       args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
     container_name: pandatales_frontend
     restart: unless-stopped
     environment:
       NODE_ENV: ${NODE_ENV:-production}
       VITE_PROXY_TARGET: ${VITE_PROXY_TARGET:-http://backend:8000}
-    ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+    expose:
+      - "3000"
     depends_on:
       - backend
+    networks:
+      - pandatales_network
+
+  nginx:
+    image: nginx:alpine
+    container_name: pandatales_nginx
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - backend
+      - minio
     networks:
       - pandatales_network
 
