@@ -115,12 +115,11 @@ export type DigitalBook = {
   rev: number;
   category_id?: number | null;
   category?: number | null;       // alias for category_id
-  book_tag?: string | null;
-  book_tags?: string[];
   category_tag?: string | null;
   category_tags?: string[];
   is_bestseller?: boolean;
   is_personalized?: boolean;
+  personalized_kind?: "story" | "coloring" | null;
   genre_name?: string | null;
   cover_image_url?: string | null;
   cover_image_presigned_url?: string | null;
@@ -132,6 +131,10 @@ export type DigitalBook = {
 
 export async function getDigitalBooks() {
   return request<DigitalBook[]>("/api/v1/digital-books");
+}
+
+export async function getDigitalBooksByCategory(categoryId: number) {
+  return request<DigitalBook[]>(`/api/v1/digital-books/category/${encodeURIComponent(String(categoryId))}`);
 }
 
 export type DigitalBookCategory = {
@@ -362,6 +365,7 @@ export type AdminPersonalizedOrderPhoto = {
 export type AdminPersonalizedOrder = {
   book_id: string;
   created_at: string;
+  template_type: "story_book" | "coloring_book" | string;
   child_name: string;
   child_age: number;
   child_gender: string;
@@ -438,8 +442,6 @@ export async function updateDigitalBookAdmin(
   input: Partial<{
     book_name: string;
     description: string | null;
-    book_tag: string | null;
-    book_tags: string[];
     category_id: number | null;
     emoji: string | null;
     total_pages: number | null;
@@ -475,19 +477,26 @@ export async function getDigitalBookPreview(bookId: number) {
 
 export async function initiatePersonalizedBookOrder(input: {
   child_name: string;
-  child_age: number;
+  child_age: number | string;
   child_gender: "male" | "female" | "other";
   parent_email: string;
   whatsapp_number?: string;
+  template_type?: "story_book" | "coloring_book";
   selected_theme_name?: string;
   photos: File[];
 }) {
+  const parsedAge = Number.parseInt(String(input.child_age).trim(), 10);
+  if (!Number.isInteger(parsedAge) || parsedAge < 1 || parsedAge > 18) {
+    throw new Error("Child age must be a whole number between 1 and 18.");
+  }
+
   const fd = new FormData();
   fd.append("child_name", input.child_name);
-  fd.append("child_age", String(input.child_age));
+  fd.append("child_age", String(parsedAge));
   fd.append("child_gender", input.child_gender);
   fd.append("parent_email", input.parent_email);
   if (input.whatsapp_number) fd.append("whatsapp_number", input.whatsapp_number);
+  if (input.template_type) fd.append("template_type", input.template_type);
   if (input.selected_theme_name) fd.append("selected_theme_name", input.selected_theme_name);
   for (const photo of input.photos) {
     fd.append("photos", photo);

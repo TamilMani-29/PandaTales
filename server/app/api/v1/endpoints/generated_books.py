@@ -43,6 +43,29 @@ def get_current_user_id() -> UUID:
     return UUID("00000000-0000-0000-0000-000000000001")
 
 
+def _parse_child_age(child_age: str | None) -> int | None:
+    """Parse age from form payload with user-friendly validation.
+
+    Accepts integer-like strings (e.g. "6", " 7 "). Returns None when omitted.
+    """
+    if child_age is None:
+        return None
+
+    raw = child_age.strip()
+    if not raw:
+        return None
+
+    try:
+        parsed = int(raw)
+    except ValueError as exc:
+        raise BadRequestException("child_age must be a whole number between 1 and 18") from exc
+
+    if parsed < 1 or parsed > 18:
+        raise BadRequestException("child_age must be between 1 and 18")
+
+    return parsed
+
+
 async def _get_or_create_guest_user(db: AsyncSession, email: str) -> UUID:
     """Look up a user by email, or create a minimal guest account if not found.
 
@@ -158,7 +181,7 @@ async def initiate_book_generation(
     template_type: str = Form(..., description="Template type: story_book or coloring_book"),
     child_id: UUID | None = Form(None, description="Child profile ID (optional)"),
     child_name: str | None = Form(None, description="Child name (required if no child_id)"),
-    child_age: int | None = Form(None, description="Child age (required if no child_id)"),
+    child_age: str | None = Form(None, description="Child age (required if no child_id)"),
     child_gender: str | None = Form(None, description="Child gender (required if no child_id)"),
     parent_email: str = Form(..., description="Parent email required for delivery and notifications"),
     whatsapp_number: str | None = Form(None, description="WhatsApp number for order updates (required for printed copies)"),
@@ -168,6 +191,8 @@ async def initiate_book_generation(
 ) -> dict[str, Any]:
     """Initiate book generation process"""
     
+    parsed_child_age = _parse_child_age(child_age)
+
     # Validate photos
     if not photos or len(photos) < 1:
         raise BadRequestException("At least 1 photo is required")
@@ -185,7 +210,7 @@ async def initiate_book_generation(
         template_type=template_type,  # type: ignore
         child_id=child_id,
         child_name=child_name,
-        child_age=child_age,
+        child_age=parsed_child_age,
         child_gender=child_gender,  # type: ignore
         parent_email=parent_email,
         whatsapp_number=whatsapp_number,
@@ -210,10 +235,11 @@ async def initiate_book_generation(
 async def generate_photo_to_coloring_book(
     child_id: UUID | None = Form(None, description="Child profile ID (optional)"),
     child_name: str | None = Form(None, description="Child name (required if no child_id)"),
-    child_age: int | None = Form(None, description="Child age (required if no child_id)"),
+    child_age: str | None = Form(None, description="Child age (required if no child_id)"),
     child_gender: str | None = Form(None, description="Child gender (required if no child_id)"),
     parent_email: str = Form(..., description="Parent email required for delivery and notifications"),
     whatsapp_number: str | None = Form(None, description="WhatsApp number for order updates (required for printed copies)"),
+    template_type: str = Form("coloring_book", description="Requested book type: story_book or coloring_book"),
     selected_theme_name: str | None = Form(None, description="Selected theme name from personalized flow (e.g. Adventure, Princess)"),
     line_weight: str = Form("medium", description="Line weight: thin, medium, thick"),
     detail_level: str = Form("medium", description="Detail level: low, medium, high"),
@@ -222,6 +248,8 @@ async def generate_photo_to_coloring_book(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Generate coloring book by converting photos directly to line art"""
+
+    parsed_child_age = _parse_child_age(child_age)
 
     # Resolve user_id from parent_email (look up or create a guest account)
     user_id = await _get_or_create_guest_user(db, parent_email)
@@ -241,10 +269,11 @@ async def generate_photo_to_coloring_book(
     generation_data = PhotoToColoringGenerationCreate(
         child_id=child_id,
         child_name=child_name,
-        child_age=child_age,
+        child_age=parsed_child_age,
         child_gender=child_gender,  # type: ignore
         parent_email=parent_email,
         whatsapp_number=whatsapp_number,
+        template_type=template_type,  # type: ignore
         selected_theme_name=selected_theme_name,
         line_weight=line_weight,  # type: ignore
         detail_level=detail_level,  # type: ignore
@@ -275,7 +304,7 @@ async def generate_theme_based_coloring_book(
     coloring_style: str = Form("simple", description="Style: simple, detailed, mandala, cartoon"),
     child_id: UUID | None = Form(None, description="Child profile ID (optional)"),
     child_name: str | None = Form(None, description="Child name (required if no child_id)"),
-    child_age: int | None = Form(None, description="Child age (required if no child_id)"),
+    child_age: str | None = Form(None, description="Child age (required if no child_id)"),
     child_gender: str | None = Form(None, description="Child gender (required if no child_id)"),
     parent_email: str = Form(..., description="Parent email required for delivery and notifications"),
     whatsapp_number: str | None = Form(None, description="WhatsApp number for order updates (required for printed copies)"),
@@ -284,6 +313,8 @@ async def generate_theme_based_coloring_book(
     user_id: UUID = Depends(get_current_user_id),
 ) -> dict[str, Any]:
     """Generate coloring book using AI based on theme and reference photos"""
+
+    parsed_child_age = _parse_child_age(child_age)
     
     # Note: Photo count validation happens in service layer based on theme config
     if not photos or len(photos) < 1:
@@ -300,7 +331,7 @@ async def generate_theme_based_coloring_book(
         coloring_style=coloring_style,  # type: ignore
         child_id=child_id,
         child_name=child_name,
-        child_age=child_age,
+        child_age=parsed_child_age,
         child_gender=child_gender,  # type: ignore
         parent_email=parent_email,
         whatsapp_number=whatsapp_number,

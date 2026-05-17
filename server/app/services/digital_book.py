@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import io
 import smtplib
+import re
 from datetime import datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
 from email.message import EmailMessage
@@ -50,6 +51,28 @@ logger = get_logger(__name__)
 
 GST_RATE_DIGITAL_PERCENT = 18
 SUPPORTED_ATTRIBUTE_OPTION_TYPES = {"book_type", "theme", "language", "genre"}
+BOOK_TYPE_SEQUENCE = [
+    "digital coloring book",
+    "digital story book",
+    "personalized coloring book",
+    "personalised story book",
+]
+CANONICAL_BOOK_TYPES = set(BOOK_TYPE_SEQUENCE)
+BOOK_TYPE_ALIASES = {
+    "story": "digital story book",
+    "story book": "digital story book",
+    "digital story": "digital story book",
+    "coloring": "digital coloring book",
+    "coloring book": "digital coloring book",
+    "digital coloring": "digital coloring book",
+    "personalized story": "personalised story book",
+    "personalized story book": "personalised story book",
+    "personalised story": "personalised story book",
+    "personalized coloring": "personalized coloring book",
+    "personalised coloring": "personalized coloring book",
+    "personalized coloring book": "personalized coloring book",
+    "personalised coloring book": "personalized coloring book",
+}
 MIN_RAZORPAY_ORDER_AMOUNT_PAISE = 100
 DOWNLOAD_TOKEN_TYPE = "digital_order_download"
 DOWNLOAD_TOKEN_EXP_MINUTES = 15
@@ -117,29 +140,42 @@ class DigitalBookService:
         ):
             raise BadRequestException("back_image must be an image file")
 
+        normalized_book_type = self._normalize_book_type_value(data.book_type)
+        derived_is_personalized = self._is_personalized_book_type(normalized_book_type)
+        if data.is_personalized != derived_is_personalized:
+            raise BadRequestException("is_personalized must match selected book_type")
+
         if book_file is not None:
             book_ext = Path(book_file.filename or "").suffix.lower()
             if book_ext != ".pdf":
                 raise BadRequestException("book_file must be a PDF")
-        elif not data.is_personalized:
+        elif not derived_is_personalized:
             raise BadRequestException("book_file (PDF) is required for non-personalized books")
 
         genre = await self._get_or_create_genre(data.genre)
-        normalized_book_tag = self._merge_tags_to_storage(data.book_tags, data.book_tag)
         normalized_category_id = await self._normalize_and_validate_category_id(data.category_id)
-        if normalized_category_id is None and not data.is_personalized:
-            raise BadRequestException(
-                "category_id is required and must reference an existing category"
+        category_row = await self._get_category_row(normalized_category_id)
+        await self._validate_book_category_placement(
+            category_row=category_row,
+            category_id=normalized_category_id,
+            is_personalized=derived_is_personalized,
+        )
+        if derived_is_personalized:
+            personalized_kind = self._infer_personalized_kind(
+                book_type=normalized_book_type,
+                category_name=category_row.name,
             )
-
-        book_type_id = await self._normalize_and_validate_attribute_option("book_type", data.book_type)
+            if personalized_kind is None:
+                raise BadRequestException(
+                    "Personalized book must be either a story book or a coloring book"
+                )
+        book_type_id = await self._normalize_and_validate_attribute_option("book_type", normalized_book_type)
         theme_id = await self._normalize_and_validate_attribute_option("theme", data.theme)
         language_id = await self._normalize_and_validate_attribute_option("language", data.language)
 
         book = Book(
             book_name=data.book_name,
             description=data.description,
-            book_tag=normalized_book_tag,
             category_id=normalized_category_id,
             emoji=(data.emoji.strip() if data.emoji else None),
             total_pages=data.total_pages,
@@ -152,7 +188,7 @@ class DigitalBookService:
             total_ratings=data.total_ratings or 0,
             download_count=data.download_count or 0,
             is_bestseller=data.is_bestseller,
-            is_personalized=data.is_personalized,
+            is_personalized=derived_is_personalized,
         )
 
         uploaded_objects: list[str] = []
@@ -271,11 +307,12 @@ class DigitalBookService:
             )
 
         if book_type is not None:
+            normalized_book_type = self._normalize_book_type_value(book_type)
             query = query.where(
                 Book.book_type_id.in_(
                     select(BookAttributeOption.id).where(
                         BookAttributeOption.option_type == "book_type",
-                        BookAttributeOption.value == book_type.strip().lower(),
+                        BookAttributeOption.value == normalized_book_type,
                     )
                 )
             )
@@ -423,6 +460,18 @@ class DigitalBookService:
             )
             self.db.add(row)
         else:
+            mismatch_count_result = await self.db.execute(
+                select(func.count(Book.id)).where(
+                    Book.category_id == normalized_id,
+                    Book.is_personalized != payload.personalized,
+                )
+            )
+            mismatch_count = int(mismatch_count_result.scalar_one() or 0)
+            if mismatch_count > 0:
+                raise BadRequestException(
+                    "Cannot change category type because existing books in this category use the opposite type"
+                )
+
             row.name = payload.name.strip()
             row.personalized_tag = self._merge_tags_to_storage(payload.tags, None)
             row.label = payload.label
@@ -461,6 +510,13 @@ class DigitalBookService:
         if validated is None:
             raise BadRequestException("category_id is required")
 
+        category_row = await self._get_category_row(validated)
+        await self._validate_book_category_placement(
+            category_row=category_row,
+            category_id=validated,
+            is_personalized=book.is_personalized,
+        )
+
         book.category_id = validated
         await self.db.commit()
 
@@ -479,8 +535,6 @@ class DigitalBookService:
             book.book_name = data.book_name
         if data.description is not None:
             book.description = data.description
-        if data.book_tags is not None or data.book_tag is not None:
-            book.book_tag = self._merge_tags_to_storage(data.book_tags, data.book_tag)
         if data.category_id is not None:
             book.category_id = await self._normalize_and_validate_category_id(data.category_id)
         if data.emoji is not None:
@@ -488,7 +542,8 @@ class DigitalBookService:
         if data.total_pages is not None:
             book.total_pages = data.total_pages
         if data.book_type is not None:
-            book.book_type_id = await self._normalize_and_validate_attribute_option("book_type", data.book_type)
+            normalized_book_type = self._normalize_book_type_value(data.book_type)
+            book.book_type_id = await self._normalize_and_validate_attribute_option("book_type", normalized_book_type)
         if data.theme is not None:
             book.theme_id = await self._normalize_and_validate_attribute_option("theme", data.theme)
         if data.language is not None:
@@ -506,8 +561,35 @@ class DigitalBookService:
             book.download_count = data.download_count
         if data.is_bestseller is not None:
             book.is_bestseller = data.is_bestseller
-        if data.is_personalized is not None:
-            book.is_personalized = data.is_personalized
+
+        book_type_value = await self._get_attribute_option_value(book.book_type_id)
+        if not book_type_value:
+            raise BadRequestException("book_type is required")
+        normalized_existing_book_type = self._normalize_book_type_value(book_type_value)
+        if normalized_existing_book_type != book_type_value:
+            book.book_type_id = await self._normalize_and_validate_attribute_option(
+                "book_type", normalized_existing_book_type
+            )
+        derived_is_personalized = self._is_personalized_book_type(normalized_existing_book_type)
+        if data.is_personalized is not None and data.is_personalized != derived_is_personalized:
+            raise BadRequestException("is_personalized must match selected book_type")
+        book.is_personalized = derived_is_personalized
+
+        category_row = await self._get_category_row(book.category_id)
+        await self._validate_book_category_placement(
+            category_row=category_row,
+            category_id=book.category_id,
+            is_personalized=book.is_personalized,
+        )
+        if book.is_personalized:
+            personalized_kind = self._infer_personalized_kind(
+                book_type=normalized_existing_book_type,
+                category_name=category_row.name,
+            )
+            if personalized_kind is None:
+                raise BadRequestException(
+                    "Personalized book must be either a story book or a coloring book"
+                )
 
         await self.db.commit()
         await self.db.refresh(book)
@@ -618,7 +700,7 @@ class DigitalBookService:
         """Return admin-managed dropdown values for book metadata fields."""
         filter_options = await self.get_filter_options()
         return {
-            "book_type": filter_options.get("book_types", []),
+            "book_type": BOOK_TYPE_SEQUENCE,
             "theme": filter_options.get("themes", []),
             "language": filter_options.get("languages", []),
             "genre": filter_options.get("genres", []),
@@ -626,6 +708,8 @@ class DigitalBookService:
 
     async def create_attribute_option(self, option_type: str, value: str) -> dict[str, str]:
         normalized_type = self._normalize_option_type(option_type)
+        if normalized_type == "book_type":
+            raise BadRequestException("book_type options are fixed and cannot be added")
         normalized_value = self._normalize_option_value(value)
 
         if normalized_type == "genre":
@@ -655,6 +739,8 @@ class DigitalBookService:
 
     async def delete_attribute_option(self, option_type: str, value: str) -> dict[str, str | bool]:
         normalized_type = self._normalize_option_type(option_type)
+        if normalized_type == "book_type":
+            raise BadRequestException("book_type options are fixed and cannot be deleted")
         normalized_value = self._normalize_option_value(value)
 
         if normalized_type == "genre":
@@ -1500,6 +1586,11 @@ class DigitalBookService:
     async def _normalize_and_validate_attribute_option(self, option_type: str, value: str) -> int:
         normalized_type = self._normalize_option_type(option_type)
         normalized_value = self._normalize_option_value(value)
+        if normalized_type == "book_type":
+            normalized_value = self._normalize_book_type_value(normalized_value)
+
+            option_id = await self._ensure_book_type_option(normalized_value)
+            return option_id
 
         result = await self.db.execute(
             select(BookAttributeOption.id).where(
@@ -1512,6 +1603,25 @@ class DigitalBookService:
         if option_id is None:
             raise BadRequestException(f"{normalized_type} option is invalid")
         return int(option_id)
+
+    async def _ensure_book_type_option(self, normalized_value: str) -> int:
+        result = await self.db.execute(
+            select(BookAttributeOption).where(
+                BookAttributeOption.option_type == "book_type",
+                BookAttributeOption.value == normalized_value,
+            )
+        )
+        row = result.scalar_one_or_none()
+        if row:
+            if not row.is_active:
+                row.is_active = True
+                await self.db.flush()
+            return int(row.id)
+
+        row = BookAttributeOption(option_type="book_type", value=normalized_value, is_active=True)
+        self.db.add(row)
+        await self.db.flush()
+        return int(row.id)
 
     @staticmethod
     def _normalize_option_type(option_type: str) -> str:
@@ -1526,6 +1636,64 @@ class DigitalBookService:
         if not normalized:
             raise BadRequestException("Option value is required")
         return normalized
+
+    @staticmethod
+    def _normalize_book_type_value(value: str) -> str:
+        normalized = (value or "").strip().lower()
+        normalized = re.sub(r"\s+", " ", normalized)
+        normalized = BOOK_TYPE_ALIASES.get(normalized, normalized)
+        if normalized not in CANONICAL_BOOK_TYPES:
+            has_personal = "personal" in normalized
+            has_story = "story" in normalized or "tale" in normalized
+            has_coloring = "color" in normalized
+
+            if has_personal and has_story:
+                normalized = "personalised story book"
+            elif has_personal and has_coloring:
+                normalized = "personalized coloring book"
+            elif has_story:
+                normalized = "digital story book"
+            elif has_coloring:
+                normalized = "digital coloring book"
+
+        if normalized not in CANONICAL_BOOK_TYPES:
+            raise BadRequestException(
+                "book_type must be one of: digital coloring book, digital story book, personalized coloring book, personalised story book"
+            )
+        return normalized
+
+    def _normalize_book_type_for_response(
+        self,
+        *,
+        book_type: str | None,
+        is_personalized: bool,
+        category_name: str | None,
+    ) -> str:
+        if book_type:
+            try:
+                return self._normalize_book_type_value(book_type)
+            except BadRequestException:
+                logger.warning(
+                    "digital_book_type_normalized_from_legacy_value",
+                    raw_book_type=book_type,
+                    is_personalized=is_personalized,
+                    category_name=category_name,
+                )
+
+        inferred_kind = self._infer_personalized_kind(book_type=book_type, category_name=category_name)
+
+        if is_personalized:
+            if inferred_kind == "coloring":
+                return "personalized coloring book"
+            return "personalised story book"
+
+        if inferred_kind == "coloring":
+            return "digital coloring book"
+        return "digital story book"
+
+    @staticmethod
+    def _is_personalized_book_type(book_type: str) -> bool:
+        return "personal" in (book_type or "")
 
     async def _to_response_dict(
         self,
@@ -1543,12 +1711,24 @@ class DigitalBookService:
         front_presigned_url = await self._presign_url(book.front_image_url, book.id, "front")
         back_presigned_url = await self._presign_url(book.back_image_url, book.id, "back")
 
+        normalized_response_book_type = self._normalize_book_type_for_response(
+            book_type=book_type,
+            is_personalized=book.is_personalized,
+            category_name=category_name,
+        )
+
+        response_is_personalized = self._is_personalized_book_type(normalized_response_book_type)
+
+        personalized_kind = (
+            self._infer_personalized_kind(book_type=normalized_response_book_type, category_name=category_name)
+            if response_is_personalized
+            else None
+        )
+
         return {
             "id": book.id,
             "book_name": book.book_name,
             "description": book.description,
-            "book_tag": book.book_tag,
-            "book_tags": self._split_tags(book.book_tag),
             "category_id": book.category_id,
             "category": book.category_id,
             "category_name": category_name,
@@ -1557,7 +1737,8 @@ class DigitalBookService:
             "category_description": category_description,
             "emoji": book.emoji,
             "is_bestseller": book.is_bestseller,
-            "is_personalized": book.is_personalized,
+            "is_personalized": response_is_personalized,
+            "personalized_kind": personalized_kind,
             "cover_image_url": book.cover_image_url,
             "cover_image_presigned_url": cover_presigned_url,
             "front_image_url": book.front_image_url,
@@ -1569,7 +1750,7 @@ class DigitalBookService:
             "book_type_id": book.book_type_id,
             "theme_id": book.theme_id,
             "language_id": book.language_id,
-            "book_type": book_type,
+            "book_type": normalized_response_book_type,
             "theme": theme,
             "language": language,
             "genre_id": book.genre_id,
@@ -1620,6 +1801,62 @@ class DigitalBookService:
             )
 
         return category_id
+
+    async def _get_category_row(self, category_id: int | None) -> BookCategory | None:
+        if category_id is None:
+            return None
+        result = await self.db.execute(
+            select(BookCategory).where(BookCategory.category_id == category_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def _validate_book_category_placement(
+        self,
+        *,
+        category_row: BookCategory | None,
+        category_id: int | None,
+        is_personalized: bool,
+    ) -> None:
+        if category_id is None:
+            raise BadRequestException("category_id is required")
+
+        if category_row is None:
+            raise BadRequestException("Category not found")
+
+        if bool(category_row.personalized) == bool(is_personalized):
+            return
+
+        if is_personalized:
+            raise BadRequestException(
+                "Personalized books can only be stored in personalized story/coloring categories"
+            )
+
+        raise BadRequestException(
+            "Digital books can only be stored in non-personalized categories"
+        )
+
+    async def _get_attribute_option_value(self, option_id: int | None) -> str | None:
+        if option_id is None:
+            return None
+        result = await self.db.execute(
+            select(BookAttributeOption.value).where(BookAttributeOption.id == option_id)
+        )
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    def _infer_personalized_kind(
+        *,
+        book_type: str | None,
+        category_name: str | None,
+    ) -> str | None:
+        source = f"{book_type or ''} {category_name or ''}".strip().lower()
+        if not source:
+            return None
+        if "color" in source:
+            return "coloring"
+        if "story" in source or "tale" in source:
+            return "story"
+        return None
 
     async def _presign_url(self, object_name: str | None, book_id: int, image_kind: str) -> str | None:
         if not object_name:

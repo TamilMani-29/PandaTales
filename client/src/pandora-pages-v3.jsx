@@ -4,6 +4,7 @@ import {
   clearToken,
   createDigitalPaymentOrder,
   getDigitalBookCategories,
+  getDigitalBooksByCategory,
   getCurrentUser,
   getDigitalBooks,
   getToken,
@@ -16,17 +17,17 @@ import {
 } from "./lib/api";
 
 const COLLECTIONS = [
-  { id:"talecraft", name:"TaleCraft", tag:"Personalised Story Books", emoji:"📖", color:"#FF6B6B", grad:"linear-gradient(135deg,#FF6B6B,#EE5A24)", desc:"Your child's name, world & imagination woven into a stunning illustrated storybook. Every book is uniquely theirs — a gift treasured forever.", personalized:true },
-  { id:"personacolor", name:"PersonaColor", tag:"Personalised Coloring Books with Your Photo", emoji:"🎨", color:"#A29BFE", grad:"linear-gradient(135deg,#A29BFE,#6C5CE7)", desc:"Upload your child's photo — we turn it into beautiful coloring art pages. Pick a magical theme & get a one-of-a-kind coloring book made just for them.", personalized:true },
-  { id:"skillsprint", name:"SkillSprint", tag:"21-Day Challenge Books", emoji:"⚡", color:"#FFB830", grad:"linear-gradient(135deg,#FFB830,#E67E22)", desc:"21-day workbooks. One skill, daily missions, epic certificate at the end. Kids actually finish these — and beg for more." },
-  { id:"rootstales", name:"RootsTales", tag:"Indian Heritage Story Books", emoji:"🪔", color:"#E17055", grad:"linear-gradient(135deg,#E17055,#D63031)", desc:"Ancient stories, festivals & heroes of India retold for today's global kids. Beautiful modern illustrations, timeless wisdom." },
-  { id:"moneyminds", name:"MoneyMinds", tag:"Financial Literacy for Kids", emoji:"💰", color:"#00B894", grad:"linear-gradient(135deg,#00B894,#00CEC9)", desc:"The most important subject schools don't teach — money. Real financial skills through stories, games, and activities kids aged 5–15 love." },
-  { id:"buildbrain", name:"BuildBrain", tag:"STEM Activity Books", emoji:"🧠", color:"#0984E3", grad:"linear-gradient(135deg,#0984E3,#74B9FF)", desc:"Hands-on science, coding & engineering activity books with real experiments kids can do at home. No special equipment needed." },
-  { id:"artvault", name:"ArtVault", tag:"Art & Creativity Books", emoji:"🚀", color:"#E84393", grad:"linear-gradient(135deg,#E84393,#FD79A8)", desc:"From first doodles to gallery-worthy masterpieces — structured art books that grow creativity, confidence and joy." },
-  { id:"kidsceo", name:"KidsCEO", tag:"Young Entrepreneur Workbooks", emoji:"👔", color:"#FDCB6E", grad:"linear-gradient(135deg,#FDCB6E,#F39C12)", desc:"12-week workbooks that teach kids to think like entrepreneurs. Business plans, budgets & real projects from day one." },
-  { id:"lifepath", name:"LifePath Board", tag:"A3 Life-Skills Snake & Ladder Cards", emoji:"🎲", color:"#00CEC9", grad:"linear-gradient(135deg,#00CEC9,#81ECEC)", desc:"Giant A3 printed game card — 25 squares of life skills, money wisdom, challenges & fun. Roll the dice, land on a square, DO the challenge!" },
-  { id:"lifeready", name:"LifeReady", tag:"Real-Life Skills Schools Never Teach", emoji:"🌟", color:"#6C5CE7", grad:"linear-gradient(135deg,#6C5CE7,#A29BFE)", desc:"From tying shoes to managing emotions, making friends to handling failure — practical, emotional and social skills that shape who they become." },
-  { id:"mindfulkids", name:"MindfulKids", tag:"Calm, Focus & Well-Being for Children", emoji:"🧘", color:"#26C6DA", grad:"linear-gradient(135deg,#26C6DA,#00838F)", desc:"Breathing exercises, mindfulness activities and calming stories that help children manage anxiety, build focus and sleep better every night." },
+  { id:"talecraft", name:"TaleCraft", emoji:"📖", color:"#FF6B6B", grad:"linear-gradient(135deg,#FF6B6B,#EE5A24)", desc:"Your child's name, world & imagination woven into a stunning illustrated storybook. Every book is uniquely theirs — a gift treasured forever.", personalized:true },
+  { id:"personacolor", name:"PersonaColor", emoji:"🎨", color:"#A29BFE", grad:"linear-gradient(135deg,#A29BFE,#6C5CE7)", desc:"Upload your child's photo — we turn it into beautiful coloring art pages. Pick a magical theme & get a one-of-a-kind coloring book made just for them.", personalized:true },
+  { id:"skillsprint", name:"SkillSprint", emoji:"⚡", color:"#FFB830", grad:"linear-gradient(135deg,#FFB830,#E67E22)", desc:"21-day workbooks. One skill, daily missions, epic certificate at the end. Kids actually finish these — and beg for more." },
+  { id:"rootstales", name:"RootsTales", emoji:"🪔", color:"#E17055", grad:"linear-gradient(135deg,#E17055,#D63031)", desc:"Ancient stories, festivals & heroes of India retold for today's global kids. Beautiful modern illustrations, timeless wisdom." },
+  { id:"moneyminds", name:"MoneyMinds", emoji:"💰", color:"#00B894", grad:"linear-gradient(135deg,#00B894,#00CEC9)", desc:"The most important subject schools don't teach — money. Real financial skills through stories, games, and activities kids aged 5–15 love." },
+  { id:"buildbrain", name:"BuildBrain", emoji:"🧠", color:"#0984E3", grad:"linear-gradient(135deg,#0984E3,#74B9FF)", desc:"Hands-on science, coding & engineering activity books with real experiments kids can do at home. No special equipment needed." },
+  { id:"artvault", name:"ArtVault", emoji:"🚀", color:"#E84393", grad:"linear-gradient(135deg,#E84393,#FD79A8)", desc:"From first doodles to gallery-worthy masterpieces — structured art books that grow creativity, confidence and joy." },
+  { id:"kidsceo", name:"KidsCEO", emoji:"👔", color:"#FDCB6E", grad:"linear-gradient(135deg,#FDCB6E,#F39C12)", desc:"12-week workbooks that teach kids to think like entrepreneurs. Business plans, budgets & real projects from day one." },
+  { id:"lifepath", name:"LifePath Board", emoji:"🎲", color:"#00CEC9", grad:"linear-gradient(135deg,#00CEC9,#81ECEC)", desc:"Giant A3 printed game card — 25 squares of life skills, money wisdom, challenges & fun. Roll the dice, land on a square, DO the challenge!" },
+  { id:"lifeready", name:"LifeReady", emoji:"🌟", color:"#6C5CE7", grad:"linear-gradient(135deg,#6C5CE7,#A29BFE)", desc:"From tying shoes to managing emotions, making friends to handling failure — practical, emotional and social skills that shape who they become." },
+  { id:"mindfulkids", name:"MindfulKids", emoji:"🧘", color:"#26C6DA", grad:"linear-gradient(135deg,#26C6DA,#00838F)", desc:"Breathing exercises, mindfulness activities and calming stories that help children manage anxiety, build focus and sleep better every night." },
 ];
 
 const BOOKS = {
@@ -93,12 +94,7 @@ const BOOKS = {
 };
 
 const Stars=({r})=><span style={{color:"#FFB830",fontSize:13,letterSpacing:1}}>{"★".repeat(Math.floor(r))}{r%1>=.5?"☆":""}<span style={{color:"#ccc"}}>{"★".repeat(5-Math.floor(r)-(r%1>=.5?1:0))}</span></span>;
-const parseTags=(value)=>{
-  if(!value) return [];
-  if(Array.isArray(value)) return value.map(v=>String(v).trim()).filter(Boolean);
-  return String(value).split(",").map(v=>v.trim()).filter(Boolean);
-};
-
+const WhatsAppIcon=({size=18,color="currentColor"})=><svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path fill={color} d="M12.04 2C6.58 2 2.15 6.43 2.15 11.89c0 1.75.46 3.46 1.33 4.97L2 22l5.27-1.39a9.86 9.86 0 0 0 4.77 1.21h.01c5.46 0 9.9-4.43 9.9-9.9A9.91 9.91 0 0 0 12.04 2Zm0 18.15h-.01a8.22 8.22 0 0 1-4.19-1.15l-.3-.18-3.13.83.84-3.06-.2-.31a8.22 8.22 0 0 1-1.27-4.39c0-4.54 3.7-8.24 8.25-8.24a8.23 8.23 0 0 1 8.25 8.24c0 4.55-3.7 8.26-8.24 8.26Zm4.53-6.17c-.25-.13-1.48-.73-1.71-.81-.23-.09-.4-.13-.56.12-.17.25-.64.81-.79.98-.15.17-.3.19-.56.06-.25-.13-1.07-.39-2.04-1.25-.75-.67-1.26-1.5-1.41-1.75-.15-.25-.02-.39.11-.52.12-.12.25-.3.37-.44.12-.15.16-.25.25-.42.08-.17.04-.31-.02-.44-.06-.13-.56-1.35-.77-1.85-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31s-.88.86-.88 2.1.9 2.44 1.02 2.61c.12.17 1.76 2.68 4.25 3.76.59.26 1.05.41 1.41.53.59.19 1.12.16 1.55.1.47-.07 1.48-.6 1.69-1.18.21-.58.21-1.08.15-1.18-.06-.1-.23-.16-.48-.29Z"/></svg>;
 export default function App(){
   const [pg,setPg]=useState("home");
   const [col,setCol]=useState(null);
@@ -118,6 +114,9 @@ export default function App(){
   const [digitalBooks,setDigitalBooks]=useState([]);
   const [digitalBooksLoading,setDigitalBooksLoading]=useState(true);
   const [digitalBooksError,setDigitalBooksError]=useState("");
+  const [collectionBooks,setCollectionBooks]=useState([]);
+  const [collectionBooksLoading,setCollectionBooksLoading]=useState(false);
+  const [collectionBooksError,setCollectionBooksError]=useState("");
   const [collections,setCollections]=useState([]);
   const [authOpen,setAuthOpen]=useState(false);
   const [authMode,setAuthMode]=useState("signin");
@@ -125,6 +124,8 @@ export default function App(){
   const [authErr,setAuthErr]=useState("");
   const [authLoading,setAuthLoading]=useState(false);
   const [personalizeBook,setPersonalizeBook]=useState(null);
+  const [pColFilter,setPColFilter]=useState(null); // "coloring" | "story" | null
+  const [heroPhotoFailed,setHeroPhotoFailed]=useState(false);
   const didInitAuth=useRef(false);
   const didLoadBooks=useRef(false);
   const didLoadCategories=useRef(false);
@@ -200,15 +201,15 @@ export default function App(){
           .map(c=>({
             id:c.category_id,
             name:c.name,
-            tags:parseTags(c.tags?.length?c.tags:[]),
-            tag:c.label||(c.personalized?"PERSONALIZED":""),
             emoji:c.emoji||"📚",
             color:c.color||"#6C5CE7",
             grad:c.grad||"linear-gradient(135deg,#6C5CE7,#A29BFE)",
             desc:c.description||"",
+            tags:Array.isArray(c.tags)?c.tags:[],
+            personalizedTag:c.personalized_tag||"",
+            label:c.label||"",
             personalized:!!c.personalized,
           }));
-        mapped.forEach(item=>{if(!item.tag&&item.tags[0])item.tag=item.tags[0];});
         setCollections(mapped);
       }catch{
         setCollections([]);
@@ -217,7 +218,119 @@ export default function App(){
   },[]);
 
   const collectionsData = collections;
-  const collectionsCountLabel = `${collectionsData.length} Magical Collections`;
+  const personalizedCollections=collectionsData.filter(c=>c.personalized);
+  const nonPersonalizedCollections=collectionsData.filter(c=>!c.personalized);
+  const collectionsCountLabel = `${nonPersonalizedCollections.length} Magical Collections`;
+  const inferPersonalizedKind=(data)=>{
+    const explicitKind=String(data?.personalized_kind||"").trim().toLowerCase();
+    if(explicitKind==="story") return "story";
+    if(explicitKind==="coloring"||explicitKind==="colouring") return "coloring";
+
+    const text=`${data?.id||""} ${data?.name||""} ${data?.book_type||""}`.toLowerCase();
+    return /colou?r/.test(text)?"coloring":"story";
+  };
+  const getCollectionBadge=(collection)=>{
+    if(collection?.personalized){
+      return inferPersonalizedKind(collection)==="coloring"?"PERSONALIZED COLORING BOOK":"PERSONALIZED STORY BOOK";
+    }
+    return "DIGITAL STORY BOOK";
+  };
+  const getBookBadge=(book,collection)=>{
+    const personalized=Boolean(book?.is_personalized);
+    if(personalized){
+      return inferPersonalizedKind({id:collection?.id,name:collection?.name,book_type:book?.book_type})==="coloring"
+        ?"PERSONALIZED COLORING BOOK"
+        :"PERSONALIZED STORY BOOK";
+    }
+    return "DIGITAL STORY BOOK";
+  };
+  const resolveCollectionFromBackend=(collectionKey)=>{
+    const normalizedKey=String(collectionKey||"").trim().toLowerCase();
+    if(!collectionsData.length) return null;
+
+    const byExactId=collectionsData.find(c=>String(c.id).toLowerCase()===normalizedKey);
+    if(byExactId) return byExactId;
+
+    const isStoryKey=normalizedKey==="talecraft"||normalizedKey==="story";
+    const isColoringKey=normalizedKey==="personacolor"||normalizedKey==="coloring";
+    const classifyPersonalized=(collection)=>{
+      const text=`${collection?.name||""} ${collection?.desc||""}`.toLowerCase();
+      return text.includes("color")?"coloring":"story";
+    };
+    if(isStoryKey){
+      return (
+        personalizedCollections.find(c=>/story|tale/i.test(`${c.name} ${c.desc}`))
+        || personalizedCollections.find(c=>classifyPersonalized(c)==="story")
+        || personalizedCollections[0]
+        || null
+      );
+    }
+    if(isColoringKey){
+      return (
+        personalizedCollections.find(c=>/color/i.test(`${c.name} ${c.desc}`))
+        || personalizedCollections.find(c=>classifyPersonalized(c)==="coloring")
+        || personalizedCollections[1]
+        || personalizedCollections[0]
+        || null
+      );
+    }
+    return null;
+  };
+  const openCollectionById=(collectionId)=>{
+    const normalizedId=String(collectionId||"").trim().toLowerCase();
+    // Personalized coloring categories — show the p-store filtered to coloring
+    if(normalizedId==="personacolor"||normalizedId==="coloring"){
+      setPColFilter("coloring");
+      go("p-store");
+      return;
+    }
+    // Personalized story categories — show the p-store filtered to story
+    if(normalizedId==="talecraft"||normalizedId==="story"){
+      setPColFilter("story");
+      go("p-store");
+      return;
+    }
+    // Numeric or other IDs: resolve directly to a collection page
+    const target=resolveCollectionFromBackend(collectionId);
+    const fallback=COLLECTIONS.find(c=>c.id===collectionId);
+    const resolved=target||fallback;
+    if(resolved) go("collection",resolved);
+  };
+
+  useEffect(()=>{
+    if(!col){
+      setCollectionBooks([]);
+      setCollectionBooksLoading(false);
+      setCollectionBooksError("");
+      return;
+    }
+    const categoryId=Number(col.id);
+    if(!Number.isInteger(categoryId)||categoryId<=0){
+      setCollectionBooks([]);
+      setCollectionBooksLoading(false);
+      setCollectionBooksError("");
+      return;
+    }
+
+    let cancelled=false;
+    (async()=>{
+      setCollectionBooksLoading(true);
+      setCollectionBooksError("");
+      try{
+        const books=await getDigitalBooksByCategory(categoryId);
+        if(cancelled) return;
+        setCollectionBooks(Array.isArray(books)?books:[]);
+      }catch{
+        if(cancelled) return;
+        setCollectionBooks([]);
+        setCollectionBooksError("Could not load books for this collection from backend.");
+      }finally{
+        if(!cancelled) setCollectionBooksLoading(false);
+      }
+    })();
+
+    return ()=>{cancelled=true;};
+  },[col]);
 
   const submitAuth=async()=>{
     setAuthErr("");setAuthLoading(true);
@@ -283,7 +396,7 @@ export default function App(){
     <div onClick={()=>go("home")} style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",fontFamily:"'Baloo 2',cursive",fontWeight:800,fontSize:"1.45rem",color:R}}><img src="/logo.png" alt="Pandora Pages" style={{height:"1.6em",width:"1.6em",objectFit:"contain",display:"block"}}/><span>Pandora<span style={{color:G}}>Pages</span></span></div>
     <div style={{display:"flex",gap:18,alignItems:"center"}}>
       {[["Products",()=>go("products")],["See the Magic",()=>{go("home");setTimeout(()=>document.getElementById("magic")?.scrollIntoView({behavior:"smooth"}),100)}],["Collections",()=>go("collections")]].map(([t,fn])=><span key={t} onClick={fn} style={{fontWeight:600,fontSize:".9rem",color:D,cursor:"pointer"}}>{t}</span>)}
-      <a href="https://chat.whatsapp.com/CMevldqAxQEAP0z40jTF5j" target="_blank" rel="noreferrer" style={{background:`linear-gradient(135deg,${W},#1FAF54)`,border:"none",color:"#fff",padding:"7px 16px",borderRadius:30,fontFamily:"'Baloo 2',cursive",fontWeight:800,fontSize:".82rem",cursor:"pointer",boxShadow:"0 4px 14px rgba(37,211,102,.4)",textDecoration:"none",display:"inline-flex",alignItems:"center",gap:6,lineHeight:1.2,whiteSpace:"nowrap",animation:"pulse 2.4s ease-in-out infinite"}}>💬 Join Community</a>
+      <a href="https://chat.whatsapp.com/CMevldqAxQEAP0z40jTF5j" target="_blank" rel="noreferrer" style={{background:`linear-gradient(135deg,${W},#1FAF54)`,border:"none",color:"#fff",padding:"7px 16px",borderRadius:30,fontFamily:"'Baloo 2',cursive",fontWeight:800,fontSize:".82rem",cursor:"pointer",boxShadow:"0 4px 14px rgba(37,211,102,.4)",textDecoration:"none",display:"inline-flex",alignItems:"center",gap:6,lineHeight:1.2,whiteSpace:"nowrap",animation:"pulse 2.4s ease-in-out infinite"}}><WhatsAppIcon size={14} color="#fff" /> Join Community</a>
       {user?<>
         <span style={{fontWeight:600,fontSize:".85rem",color:R}}>👋 {profile?.full_name||user.email?.split("@")[0]}</span>
         <button onClick={signOut} style={{background:"transparent",border:`1.5px solid ${R}`,color:R,padding:"7px 16px",borderRadius:30,fontFamily:"inherit",fontWeight:700,fontSize:".82rem",cursor:"pointer"}}>Sign Out</button>
@@ -294,7 +407,7 @@ export default function App(){
     </div>
   </nav>;
 
-  const WA=()=><a href="https://chat.whatsapp.com/CMevldqAxQEAP0z40jTF5j" target="_blank" rel="noreferrer" style={{position:"fixed",bottom:24,right:24,zIndex:999,width:60,height:60,borderRadius:"50%",background:W,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 6px 25px rgba(37,211,102,.4)",textDecoration:"none",fontSize:28,animation:"waBounce 3s ease-in-out infinite"}}>💬</a>;
+  const WA=()=><a href="https://chat.whatsapp.com/CMevldqAxQEAP0z40jTF5j" target="_blank" rel="noreferrer" style={{position:"fixed",bottom:24,right:24,zIndex:999,width:60,height:60,borderRadius:"50%",background:W,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 6px 25px rgba(37,211,102,.4)",textDecoration:"none",animation:"waBounce 3s ease-in-out infinite"}}><WhatsAppIcon size={28} color="#fff" /></a>;
 
   const Card3D=({c})=>{
     const [tilt,setTilt]=useState({x:0,y:0,active:false});
@@ -314,10 +427,9 @@ export default function App(){
           <div>
             <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:18}}>
               <div style={{width:64,height:64,borderRadius:18,background:"rgba(255,255,255,.22)",backdropFilter:"blur(10px)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:34,boxShadow:"inset 0 1px 0 rgba(255,255,255,.4), 0 8px 24px rgba(0,0,0,.18)",transform:"translateZ(30px)"}}>{c.emoji}</div>
-              {(c.personalized||c.tag)&&<div style={{background:"rgba(255,255,255,.95)",color:c.color,padding:"5px 12px",borderRadius:20,fontSize:".68rem",fontWeight:800,boxShadow:"0 4px 12px rgba(0,0,0,.15)",transform:"translateZ(40px)"}}>{c.tag||"📷 PERSONALIZED"}</div>}
+              <div style={{background:"rgba(255,255,255,.95)",color:c.color,padding:"5px 12px",borderRadius:20,fontSize:".68rem",fontWeight:800,boxShadow:"0 4px 12px rgba(0,0,0,.15)",transform:"translateZ(40px)"}}>{getCollectionBadge(c)}</div>
             </div>
             <h3 style={{fontFamily:"'Baloo 2',cursive",fontSize:"1.6rem",color:"#fff",margin:"0 0 4px",textShadow:"0 2px 8px rgba(0,0,0,.15)",transform:"translateZ(20px)"}}>{c.name}</h3>
-            {c.tags?.length>0&&<div style={{display:"flex",gap:6,flexWrap:"wrap",margin:"0 0 12px",transform:"translateZ(15px)"}}>{c.tags.map((tag)=><span key={tag} style={{fontSize:".66rem",color:"rgba(255,255,255,.95)",background:"rgba(255,255,255,.2)",padding:"3px 9px",borderRadius:999,fontWeight:700}}>{tag}</span>)}</div>}
             <p style={{fontSize:".88rem",color:"rgba(255,255,255,.92)",lineHeight:1.6,margin:0,display:"-webkit-box",WebkitLineClamp:3,WebkitBoxOrient:"vertical",overflow:"hidden",transform:"translateZ(10px)"}}>{c.desc}</p>
           </div>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",paddingTop:16,borderTop:"1px solid rgba(255,255,255,.25)",transform:"translateZ(25px)"}}>
@@ -360,14 +472,13 @@ export default function App(){
           {!frontCover && <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:88,filter:"drop-shadow(0 8px 18px rgba(0,0,0,.25))",transform:`translateZ(50px) scale(${tilt.active?1.06:1})`,transition:"transform .4s"}}>{b.emoji}</div>}
           <div style={{position:"absolute",top:12,left:12,background:"rgba(255,255,255,.95)",color:col.color,padding:"4px 10px",borderRadius:20,fontSize:".68rem",fontWeight:800,boxShadow:"0 4px 12px rgba(0,0,0,.15)",transform:"translateZ(40px)"}}>{b.style}</div>
           <div style={{position:"absolute",bottom:12,right:12,background:"#fff",color:col.color,padding:"6px 14px",borderRadius:30,fontFamily:"'Baloo 2',cursive",fontWeight:800,fontSize:"1.02rem",boxShadow:"0 6px 18px rgba(0,0,0,.2)",transform:"translateZ(50px)"}}>₹{b.price}</div>
-          {isP&&<div style={{position:"absolute",top:12,right:12,background:`linear-gradient(135deg,${G},#FFC947)`,color:D,padding:"4px 10px",borderRadius:20,fontSize:".66rem",fontWeight:800,boxShadow:"0 4px 12px rgba(0,0,0,.18)",transform:"translateZ(45px)"}}>📷 PERSONALIZE</div>}
+          <div style={{position:"absolute",top:12,right:12,background:`linear-gradient(135deg,${G},#FFC947)`,color:D,padding:"4px 10px",borderRadius:20,fontSize:".64rem",fontWeight:800,boxShadow:"0 4px 12px rgba(0,0,0,.18)",transform:"translateZ(45px)"}}>{getBookBadge(b,col)}</div>
         </div>
         {/* Body */}
         <div style={{padding:"16px 18px 18px",transform:"translateZ(20px)",position:"relative",display:"flex",flexDirection:"column",minHeight:200}}>
           <h3 style={{fontFamily:"'Baloo 2',cursive",fontSize:"1.05rem",color:D,margin:"0 0 5px",lineHeight:1.25}}>{b.title}</h3>
           <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:7}}><Stars r={b.rat}/><span style={{fontSize:".7rem",color:"#999",fontWeight:600}}>{b.rat} ({b.rev})</span></div>
           <p style={{fontSize:".8rem",color:"#777",lineHeight:1.55,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden",margin:"0 0 10px"}}>{b.desc}</p>
-          {b.tags?.length>0&&<div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:8}}>{b.tags.map((tag)=><span key={tag} style={{background:`${col.color}16`,color:col.color,padding:"2px 8px",borderRadius:10,fontSize:".66rem",fontWeight:700}}>{tag}</span>)}</div>}
           <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:10}}>{[b.age,`${b.pages}${b.pages===1?" board":" pg"}`].map(t=><span key={t} style={{background:`${col.color}10`,color:col.color,padding:"3px 9px",borderRadius:10,fontSize:".68rem",fontWeight:700}}>{t}</span>)}</div>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",paddingTop:8,borderTop:`1px solid ${col.color}15`,marginTop:"auto"}}>
             <span style={{fontSize:".75rem",color:"#aaa",fontWeight:600}}>{isP?"Free preview":"Instant delivery"}</span>
@@ -395,23 +506,38 @@ export default function App(){
           </h1>
           <p style={{fontSize:"1.08rem",color:"#555",lineHeight:1.7,marginBottom:26,maxWidth:500}}>Personalized story books & coloring books with your child's <strong>real photo</strong> woven into every page. Plus {collectionsData.length} magical collections starting at just ₹99!</p>
           <div style={{display:"flex",gap:14,flexWrap:"wrap"}}>
-            <Btn onClick={()=>go("products")}>✨ Our Products</Btn>
-            <Btn bg={G} cl={D} onClick={()=>document.getElementById("magic")?.scrollIntoView({behavior:"smooth"})} s={{boxShadow:"0 6px 20px rgba(255,184,48,.3)",color:D}}>📷 See the Magic</Btn>
+            <Btn onClick={()=>openCollectionById("talecraft")}>✨ Create Your Own Stroy Book</Btn>
+            <Btn bg={G} cl={D} onClick={()=>openCollectionById("personacolor")} s={{boxShadow:"0 6px 20px rgba(255,184,48,.3)",color:D}}>🎨 Create Your Own Coloring Book</Btn>
           </div>
         </div>
         <div style={{position:"relative",height:420,display:"flex",alignItems:"center",justifyContent:"center"}}>
           {["✨","⭐","💫","🌟","✨"].map((s,i)=><span key={i} style={{position:"absolute",fontSize:18,animation:`float 2s ease-in-out infinite ${i*.4}s`,...[{top:10,right:50},{top:70,right:5},{bottom:50,left:50},{top:"50%",left:5},{bottom:5,right:"35%"}][i]}}>{s}</span>)}
           <div style={{position:"absolute",top:30,left:10,width:185,borderRadius:16,overflow:"hidden",boxShadow:"0 12px 40px rgba(0,0,0,.12)",transform:"rotate(-6deg)",border:"4px solid #fff",background:"#fff"}}>
-            <div style={{height:210,background:"linear-gradient(135deg,#FFE8D6,#FFDAB9)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:56}}>👧</div>
-            <div style={{padding:10,textAlign:"center",fontFamily:"'Baloo 2',cursive",fontWeight:700,fontSize:".82rem",color:"#E67E22"}}>📸 Upload Real Photo</div>
+            <div style={{height:210,background:"linear-gradient(135deg,#FFE8D6,#FFDAB9)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:56,position:"relative"}}>
+              {!heroPhotoFailed ? (
+                <img
+                  src="/image.png"
+                  alt="Child photo"
+                  onError={()=>setHeroPhotoFailed(true)}
+                  style={{width:"100%",height:"100%",objectFit:"cover"}}
+                />
+              ) : (
+                <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,color:"#E67E22"}}>
+                  <span style={{fontSize:52,lineHeight:1}}>👦</span>
+                  <span style={{fontSize:".75rem",fontWeight:700}}>Real Child Photo</span>
+                </div>
+              )}
+            </div>
+            <div style={{padding:10,textAlign:"center",fontFamily:"'Baloo 2',cursive",fontWeight:700,fontSize:".82rem",color:"#E67E22"}}>📷 Real Child Photo</div>
           </div>
           <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-55%,-50%)",zIndex:10,width:65,height:65,borderRadius:"50%",background:`linear-gradient(135deg,${G},#FFD77A)`,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 8px 25px rgba(255,184,48,.4)",animation:"pulse 2s ease-in-out infinite",fontSize:24,color:"#fff",fontWeight:800}}>→</div>
           <div style={{position:"absolute",bottom:10,right:0,width:210,borderRadius:16,overflow:"hidden",boxShadow:`0 18px 50px rgba(74,31,184,.2)`,transform:"rotate(4deg)",border:`4px solid ${G}`,background:"#fff"}}>
             <div style={{height:240,background:`linear-gradient(135deg,#EDE7FF,#C4B5FD,#A78BFA)`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:14,position:"relative"}}>
-              <div style={{position:"absolute",top:8,left:8,background:"rgba(255,255,255,.9)",padding:"2px 8px",borderRadius:16,fontSize:".58rem",fontWeight:700,color:R}}>📷 Real Photo Inside</div>
-              <div style={{fontFamily:"'Baloo 2',cursive",fontSize:".85rem",color:"#fff",textAlign:"center",textShadow:"0 2px 6px rgba(0,0,0,.2)",marginBottom:6}}>Princess Ananya<br/><strong style={{fontSize:"1.1rem"}}>& the Dragon!</strong></div>
-              <div style={{fontSize:50}}>🦸‍♀️</div>
-              <div style={{fontSize:".7rem",color:"rgba(255,255,255,.8)",marginTop:4}}>Her real face in every illustration</div>
+              <img
+                src="/output_image.png"
+                alt="Preview image"
+                style={{width:162,height:194,objectFit:"cover",borderRadius:10,boxShadow:"0 8px 20px rgba(0,0,0,.2)"}}
+              />
             </div>
             <div style={{padding:10,textAlign:"center",background:`linear-gradient(135deg,${R},${L})`,fontFamily:"'Baloo 2',cursive",fontWeight:700,fontSize:".85rem",color:"#fff"}}>Her face is IN the book!</div>
           </div>
@@ -428,20 +554,26 @@ export default function App(){
         <div style={{position:"relative",height:420}}>
           <div style={{position:"absolute",top:30,left:0,width:240,borderRadius:18,overflow:"hidden",transform:"rotate(-5deg)",border:"3px solid #FFD4A8",boxShadow:"0 16px 50px rgba(0,0,0,.1)",background:"#fff",zIndex:1}}>
             <div style={{height:220,background:"linear-gradient(135deg,#FFF5EB,#FFE8D6)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",position:"relative"}}>
-              <div style={{fontSize:56}}>📷</div>
+              <img
+                src="/image.png"
+                alt="Boy photo"
+                style={{width:"100%",height:"100%",objectFit:"cover"}}
+              />
             </div>
             <div style={{padding:"14px 16px",textAlign:"center"}}>
-              <div style={{fontFamily:"'Baloo 2',cursive",fontSize:"1rem",color:"#E67E22",marginBottom:2}}>Ananya's School Photo</div>
-              <div style={{fontSize:".78rem",color:"#999"}}>A regular photo of your child</div>
+              <div style={{fontFamily:"'Baloo 2',cursive",fontSize:"1rem",color:"#E67E22",marginBottom:2}}>Boy Photo</div>
+              <div style={{fontSize:".78rem",color:"#999"}}>Input child photo</div>
             </div>
             <div style={{padding:"8px",textAlign:"center",background:"#FFF5EB",fontFamily:"'Baloo 2',cursive",fontSize:".78rem",color:"#E67E22",fontWeight:700}}>Step 1: Upload Photo</div>
           </div>
           <div style={{position:"absolute",top:"50%",left:"48%",transform:"translate(-50%,-50%)",zIndex:5,width:64,height:64,borderRadius:"50%",background:`linear-gradient(135deg,${G},#FFD77A)`,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 6px 25px rgba(255,184,48,.4)",animation:"pulse 2s ease-in-out infinite",fontSize:22,color:"#fff",fontWeight:800}}>→</div>
           <div style={{position:"absolute",top:10,right:0,width:260,borderRadius:18,overflow:"hidden",transform:"rotate(3deg)",border:`3px solid ${G}`,boxShadow:`0 20px 55px rgba(74,31,184,.15)`,background:"#fff",zIndex:2}}>
             <div style={{height:260,background:`linear-gradient(135deg,#EDE7FF,#C4B5FD)`,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:16,position:"relative"}}>
-              <div style={{fontSize:48,marginBottom:6}}>👸</div>
-              <div style={{fontFamily:"'Baloo 2',cursive",fontSize:"1.05rem",color:"#fff",textAlign:"center",textShadow:"0 2px 8px rgba(0,0,0,.2)",lineHeight:1.3}}>Princess Ananya<br/>& the Dragon!</div>
-              <div style={{fontSize:".75rem",color:"rgba(255,255,255,.8)",marginTop:6}}>Her real face in every illustration</div>
+              <img
+                src="/output_queen.png"
+                alt="Output image"
+                style={{width:170,height:220,objectFit:"contain"}}
+              />
             </div>
             <div style={{padding:"10px",textAlign:"center",background:`linear-gradient(135deg,${R},${L})`,fontFamily:"'Baloo 2',cursive",fontWeight:700,fontSize:".85rem",color:"#fff"}}>Her face is IN the book!</div>
           </div>
@@ -466,12 +598,12 @@ export default function App(){
         <h2 style={{fontFamily:"'Baloo 2',cursive",fontSize:"clamp(2rem,4vw,2.8rem)",color:D,marginBottom:8}}><span style={{color:G}}>{collectionsData.length}</span> Magical Collections</h2>
         <p style={{color:"#888",fontSize:"1.02rem"}}>Every child. Every interest. Every dream.</p>
       </div>
-      {collectionsData.length>0 ? (
+      {nonPersonalizedCollections.length>0 ? (
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(310px,1fr))",gap:28,maxWidth:1180,margin:"0 auto"}}>
-          {collectionsData.map(c=><Card3D key={c.id} c={c}/>)}
+          {nonPersonalizedCollections.map(c=><Card3D key={c.id} c={c}/>)}
         </div>
       ) : (
-        <div style={{maxWidth:1180,margin:"0 auto",textAlign:"center",padding:"24px 0",color:"#777",fontWeight:600}}>No collections available in database.</div>
+        <div style={{maxWidth:1180,margin:"0 auto",textAlign:"center",padding:"24px 0",color:"#777",fontWeight:600}}>No non-personalized collections available in database.</div>
       )}
       <div style={{textAlign:"center",marginTop:36}}>
         <Btn onClick={()=>go("collections")}>See All Collections →</Btn>
@@ -479,9 +611,9 @@ export default function App(){
     </section>
 
     <section style={{padding:"70px 20px",background:"linear-gradient(135deg,#E8F5E9,#C8E6C9,#A5D6A7)",textAlign:"center"}}>
-      <h2 style={{fontFamily:"'Baloo 2',cursive",fontSize:"clamp(1.6rem,3vw,2.2rem)",color:"#1B5E20",marginBottom:10}}>🟢 Join Our WhatsApp Community</h2>
+      <h2 style={{fontFamily:"'Baloo 2',cursive",fontSize:"clamp(1.6rem,3vw,2.2rem)",color:"#1B5E20",marginBottom:10,display:"inline-flex",alignItems:"center",gap:10}}><WhatsAppIcon size={26} color={W} /> Join Our WhatsApp Community</h2>
       <p style={{color:"#2E7D32",fontSize:"1rem",marginBottom:28}}>Weekly FREE coloring pages, story prompts & exclusive deals!</p>
-      <a href="https://chat.whatsapp.com/CMevldqAxQEAP0z40jTF5j" target="_blank" rel="noreferrer" style={{display:"inline-flex",alignItems:"center",gap:8,background:W,color:"#fff",padding:"16px 40px",borderRadius:50,fontFamily:"'Baloo 2',cursive",fontSize:"1.1rem",fontWeight:700,textDecoration:"none",animation:"glow 2s ease-in-out infinite"}}>💬 Join 2,000+ Parents — FREE</a>
+      <a href="https://chat.whatsapp.com/CMevldqAxQEAP0z40jTF5j" target="_blank" rel="noreferrer" style={{display:"inline-flex",alignItems:"center",gap:8,background:W,color:"#fff",padding:"16px 40px",borderRadius:50,fontFamily:"'Baloo 2',cursive",fontSize:"1.1rem",fontWeight:700,textDecoration:"none",animation:"glow 2s ease-in-out infinite"}}><WhatsAppIcon size={18} color="#fff" /> Join 2,000+ Parents — FREE</a>
     </section>
 
     <section style={{padding:"70px 20px",background:C}}>
@@ -508,21 +640,21 @@ export default function App(){
       <svg style={{position:"absolute",bottom:-1,left:0,right:0}} viewBox="0 0 1440 50" fill="none"><path d="M0 50V20C360 50 720 0 1080 20C1260 30 1380 45 1440 50H0Z" fill={C}/></svg>
     </div>
     <div style={{maxWidth:1180,margin:"0 auto",padding:"50px 20px 90px"}}>
-      {collectionsData.length>0 ? (
+      {nonPersonalizedCollections.length>0 ? (
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(310px,1fr))",gap:28}}>
-          {collectionsData.map(c=><Card3D key={c.id} c={c}/>)}
+          {nonPersonalizedCollections.map(c=><Card3D key={c.id} c={c}/>)}
         </div>
       ) : (
-        <div style={{textAlign:"center",padding:"24px 0",color:"#777",fontWeight:600}}>No collections available in database.</div>
+        <div style={{textAlign:"center",padding:"24px 0",color:"#777",fontWeight:600}}>No non-personalized collections available in database.</div>
       )}
     </div>
   </div>;
 
   const Products=()=>{
     const items=[
-      {emoji:"📱",title:"Digital Books",badge:"📚 Ready-Made Catalog",badgeBg:"linear-gradient(135deg,#27AE60,#2ECC71)",desc:"10 magical collections — stories, STEM, art, life skills & more. Instant digital delivery to your inbox or WhatsApp!",price:"₹99",pl:"per book onwards",cta:"Browse Collections",action:()=>go("collections"),hdr:"linear-gradient(135deg,#E8F5E9,#C8E6C9)",tag:"🔥 From ₹99",tagBg:"#FF6B6B",tagC:"#fff",feats:["Instant delivery","40+ titles","Ages 2–15"]},
-      {emoji:"🎨",title:"Coloring Books",badge:"📷 Personalized",badgeBg:`linear-gradient(135deg,${R},${L})`,desc:"10 personalized coloring pages featuring your child's real photo as line art. Printed & shipped to your doorstep!",price:"₹199",pl:"printed & shipped",cta:"Create Coloring Book",action:()=>go("collection",COLLECTIONS[1]),hdr:"linear-gradient(135deg,#FFF3E0,#FFECB3)",tag:"📷 Personalized",tagBg:G,tagC:D,feats:["Real photo as line art","10 themed pages","Free preview first"]},
-      {emoji:"📖",title:"Story Books",badge:"📷 Personalized + Real Photo",badgeBg:`linear-gradient(135deg,${R},${L})`,desc:"Your child's real photo inside a fully illustrated storybook — they become the hero of an unforgettable adventure!",price:"₹399",pl:"printed & shipped",cta:"Create Story Book",action:()=>go("collection",COLLECTIONS[0]),hdr:"linear-gradient(135deg,#EDE7FF,#F3E8FF)",tag:"⭐ Premium",tagBg:R,tagC:"#fff",feats:["Hardcover printed","Real face on every page","24–32 illustrated pages"]},
+      {emoji:"📱",title:"Digital Books",badge:"📚 Ready-Made Catalog",badgeBg:"linear-gradient(135deg,#27AE60,#2ECC71)",desc:"10 magical collections — stories, STEM, art, life skills & more. Instant digital delivery to your inbox or WhatsApp!",price:"₹99",pl:"per book onwards",cta:"Browse Collections",action:()=>go("collections"),hdr:"linear-gradient(135deg,#E8F5E9,#C8E6C9)",feats:["Instant delivery","40+ titles","Ages 2–15"]},
+      {emoji:"🎨",title:"Coloring Books",badge:"📷 Personalized",badgeBg:`linear-gradient(135deg,${R},${L})`,desc:"10 personalized coloring pages featuring your child's real photo as line art. Printed & shipped to your doorstep!",price:"₹199",pl:"printed & shipped",cta:"Create Coloring Book",action:()=>openCollectionById("personacolor"),hdr:"linear-gradient(135deg,#FFF3E0,#FFECB3)",feats:["Real photo as line art","10 themed pages","Free preview first"]},
+      {emoji:"📖",title:"Story Books",badge:"📷 Personalized + Real Photo",badgeBg:`linear-gradient(135deg,${R},${L})`,desc:"Your child's real photo inside a fully illustrated storybook — they become the hero of an unforgettable adventure!",price:"₹399",pl:"printed & shipped",cta:"Create Story Book",action:()=>openCollectionById("talecraft"),hdr:"linear-gradient(135deg,#EDE7FF,#F3E8FF)",feats:["Hardcover printed","Real face on every page","24–32 illustrated pages"]},
     ];
     return <div style={{background:C,minHeight:"100vh",paddingTop:70}}>
       <div style={{background:`linear-gradient(135deg,${R},#6C5CE7,${L})`,padding:"50px 24px 70px",position:"relative",overflow:"hidden",textAlign:"center"}}>
@@ -540,7 +672,6 @@ export default function App(){
               <div style={{fontSize:"3.5rem",marginBottom:10}}>{p.emoji}</div>
               <div style={{display:"inline-flex",padding:"3px 12px",borderRadius:20,fontSize:".72rem",fontWeight:700,background:p.badgeBg,color:"#fff",marginBottom:10}}>{p.badge}</div>
               <h3 style={{fontFamily:"'Baloo 2',cursive",fontSize:"1.45rem"}}>{p.title}</h3>
-              <span style={{position:"absolute",top:14,right:14,background:p.tagBg,color:p.tagC,padding:"3px 10px",borderRadius:20,fontSize:".7rem",fontWeight:700}}>{p.tag}</span>
             </div>
             <div style={{padding:"22px 26px 28px"}}>
               <p style={{fontSize:".92rem",color:"#666",lineHeight:1.7,marginBottom:14}}>{p.desc}</p>
@@ -554,29 +685,103 @@ export default function App(){
     </div>;
   };
 
+  // ── Personalized-book store (coloring or story categories) ─────────────
+  const PersonalizedStore=()=>{
+    const kind=pColFilter; // "coloring" | "story" | null
+    // Categories are shared/common for personalized products.
+    // We keep category list same and split story/coloring at book level
+    // after user enters a category.
+    const filtered=personalizedCollections;
+    const title=kind==="coloring"?"Coloring Books":kind==="story"?"Story Books":"Personalized Books";
+    const subtitle=kind==="coloring"
+      ?"Your child's real photo transformed into beautiful coloring art — printed & shipped."
+      :kind==="story"
+      ?"Your child becomes the hero with their real face on every illustrated page."
+      :"Personalized books made just for your child.";
+    const badgeLabel=kind==="coloring"?"🎨 COLORING BOOKS":kind==="story"?"📖 STORY BOOKS":"✨ PERSONALIZED BOOKS";
+    return <div style={{background:C,minHeight:"100vh",paddingTop:70}}>
+      <div style={{background:`linear-gradient(135deg,${R},#6C5CE7,${L})`,padding:"50px 24px 70px",position:"relative",overflow:"hidden",textAlign:"center"}}>
+        <div onClick={()=>go("products")} style={{display:"inline-flex",alignItems:"center",gap:6,cursor:"pointer",color:"rgba(255,255,255,.7)",fontSize:".88rem",fontWeight:600,marginBottom:14}}>← Back to Products</div>
+        <div style={{marginBottom:12}}>
+          <span style={{background:"rgba(255,255,255,.15)",padding:"4px 16px",borderRadius:20,fontSize:".75rem",fontWeight:700,color:"#fff",letterSpacing:1}}>{badgeLabel}</span>
+        </div>
+        <h1 style={{fontFamily:"'Baloo 2',cursive",fontSize:"clamp(1.8rem,4vw,2.6rem)",color:"#fff",margin:"8px 0 6px"}}>{title}</h1>
+        <p style={{color:"rgba(255,255,255,.75)",fontSize:"1rem",maxWidth:520,margin:"0 auto 14px"}}>{subtitle}</p>
+        <div style={{display:"inline-flex",alignItems:"center",gap:6,background:"rgba(255,255,255,.15)",padding:"6px 16px",borderRadius:30,fontSize:".82rem",color:"#fff",fontWeight:600}}>📷 Personalized with your child's real photo</div>
+        <svg style={{position:"absolute",bottom:-1,left:0,right:0}} viewBox="0 0 1440 50" fill="none"><path d="M0 50V20C360 50 720 0 1080 20C1260 30 1380 45 1440 50H0Z" fill={C}/></svg>
+      </div>
+      <div style={{maxWidth:1180,margin:"0 auto",padding:"50px 20px 90px"}}>
+        {filtered.length>0?(
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(310px,1fr))",gap:28}}>
+            {filtered.map(c=><Card3D key={c.id} c={c}/>)}
+          </div>
+        ):(
+          <div style={{textAlign:"center",padding:"60px 20px"}}>
+            <div style={{fontSize:52,marginBottom:14}}>📚</div>
+            <h3 style={{fontFamily:"'Baloo 2',cursive",fontSize:"1.4rem",color:D,marginBottom:8}}>No {title} categories yet</h3>
+            <p style={{color:"#888",fontSize:".92rem",maxWidth:460,margin:"0 auto 24px"}}>{kind==="coloring"?"Personalized coloring book":"Personalized story book"} categories will appear here once they are set up in the admin panel with the <strong>Personalized</strong> flag enabled.</p>
+            <Btn onClick={()=>go("products")}>← Back to Products</Btn>
+          </div>
+        )}
+      </div>
+    </div>;
+  };
+
   const Collection=()=>{
     if(!col) return null;
-    const genreMap={
-      rootstales:["moral","bedtime","fantasy"],
-      skillsprint:["educational","adventure"],
-      moneyminds:["educational"],
-      buildbrain:["educational"],
-      artvault:["comedy","adventure"],
-      kidsceo:["educational"],
-      lifeready:["moral","educational"],
-      lifepath:["adventure","comedy"],
-    };
-    const isP=col.personalized;
-    const staticBooks=BOOKS[col.id]||[];
-    const selectedCollectionId = String(col.id ?? "");
-    const selectedCollectionName = String(col.name ?? "").trim().toLowerCase();
-    const fromApi=digitalBooks
+    const selectedCollectionId=String(col.id??"");
+
+    // Determine whether this is a personalized collection.
+    // Prefer the category's own flag; fall back to auto-detecting from the
+    // loaded books (covers categories where the DB flag was not set yet).
+    const rawIsP=col.personalized;
+    const booksAllPersonalized=
+      !collectionBooksLoading&&
+      collectionBooks.length>0&&
+      collectionBooks.every(b=>{
+        const bt=String(b.book_type||"").toLowerCase();
+        return Boolean(b.is_personalized)||bt.includes("personal");
+      });
+    const isP=rawIsP||booksAllPersonalized;
+    const modeKind=(pColFilter==="coloring"||pColFilter==="story")?pColFilter:null;
+
+    const fromApi=collectionBooks
       .filter(b=>{
-        const categoryId = b.category_id ?? b.category;
-        const bookCategoryName = String(b.category_name ?? "").trim().toLowerCase();
-        return String(categoryId)===selectedCollectionId
-          || (selectedCollectionName !== "" && bookCategoryName === selectedCollectionName)
-          || genreMap[col.id]?.includes((b.genre_name||"").toLowerCase());
+        // 1. Must belong to this category.
+        const categoryId=b.category_id??b.category;
+        if(String(categoryId)!==selectedCollectionId) return false;
+
+        // 2. Determine if the book is actually personalized based on both
+        //    the is_personalized flag AND the book_type string so we catch
+        //    any inconsistency between the two.
+        const bt=String(b.book_type||"").trim().toLowerCase();
+        const bookIsP=Boolean(b.is_personalized)||bt.includes("personal");
+
+        // 3. For a personalized collection show only personalized books;
+        //    for a digital collection show only non-personalized books.
+        //    Do NOT further filter by coloring-vs-story kind — the user
+        //    already navigated to this specific category.
+        if(isP&&!bookIsP) return false;
+        if(!isP&&bookIsP) return false;
+
+        // 4. Extra guard: never show a "digital …" typed book inside a
+        //    personalized collection (in case of data inconsistency).
+        if(isP&&bt.startsWith("digital")) return false;
+
+        // 5. If user came from Story/Coloring entry point, split books by
+        //    selected mode inside this category (categories remain common).
+        if(isP&&modeKind){
+          const bookKind=inferPersonalizedKind({
+            id:b.id,
+            name:b.title,
+            desc:b.desc,
+            book_type:b.book_type,
+            personalized_kind:b.personalized_kind,
+          });
+          if(bookKind!==modeKind) return false;
+        }
+
+        return true;
       })
       .map(b=>({
         id:b.id,
@@ -585,25 +790,27 @@ export default function App(){
         age:b.age || "All ages",
         pages:b.pages,
         style:b.style || "Standard",
+        book_type:b.book_type || "",
+        personalized_kind:b.personalized_kind || null,
+        is_personalized:!!b.is_personalized,
         emoji:b.emoji||"📘",
         rat:b.rat,
         rev:b.rev,
         desc:b.desc,
-        tags:parseTags(b.book_tags?.length?b.book_tags:b.book_tag),
         category_id:b.category_id,
         cover_image_url:b.cover_image_presigned_url || b.cover_image_url || null,
         front_image_url:b.front_image_presigned_url || b.front_image_url || b.cover_image_presigned_url || b.cover_image_url || null,
         back_image_url:b.back_image_presigned_url || b.back_image_url || null,
       }));
-    const bks=(fromApi.length>0?fromApi:staticBooks).slice(0,1);
+    const bks=fromApi;
     return <div style={{background:C,minHeight:"100vh",paddingTop:70}}>
       <div style={{background:col.grad,padding:"40px 24px 60px",position:"relative",overflow:"hidden"}}>
-        <div onClick={()=>go("collections")} style={{display:"inline-flex",alignItems:"center",gap:6,cursor:"pointer",color:"rgba(255,255,255,.7)",fontSize:".88rem",fontWeight:600,marginBottom:14}}>← Back to Collections</div>
+        <div onClick={()=>isP?go("p-store"):go("collections")} style={{display:"inline-flex",alignItems:"center",gap:6,cursor:"pointer",color:"rgba(255,255,255,.7)",fontSize:".88rem",fontWeight:600,marginBottom:14}}>{isP?"← Back to Categories":"← Back to Collections"}</div>
         <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:8}}>
           <div style={{width:52,height:52,borderRadius:16,background:"rgba(255,255,255,.15)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28}}>{col.emoji}</div>
           <div>
             <h1 style={{fontFamily:"'Baloo 2',cursive",fontSize:"clamp(1.6rem,3vw,2.3rem)",color:"#fff",margin:0}}>{col.name}</h1>
-            {col.tags?.length>0&&<div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}>{col.tags.map((tag)=><span key={tag} style={{color:"rgba(255,255,255,.95)",fontSize:".7rem",fontWeight:700,background:"rgba(255,255,255,.2)",padding:"3px 9px",borderRadius:999}}>{tag}</span>)}</div>}
+            <div style={{display:"inline-flex",marginTop:6,color:"rgba(255,255,255,.95)",fontSize:".7rem",fontWeight:700,background:"rgba(255,255,255,.2)",padding:"3px 9px",borderRadius:999}}>{isP?getCollectionBadge({...col,personalized:true}):getCollectionBadge(col)}</div>
           </div>
         </div>
         <p style={{color:"rgba(255,255,255,.8)",fontSize:".92rem",maxWidth:580,lineHeight:1.6}}>{col.desc}</p>
@@ -617,15 +824,18 @@ export default function App(){
         </div>
       </div>}
       <div style={{maxWidth:1100,margin:"0 auto",padding:"40px 20px 90px"}}>
-        {(digitalBooksLoading) ? (
+        {(collectionBooksLoading || digitalBooksLoading) ? (
           <div style={{textAlign:"center",padding:"40px 0",color:"#777",fontWeight:600}}>Loading books from backend...</div>
-        ) : (digitalBooksError) ? (
-          <div style={{textAlign:"center",padding:"40px 0",color:"#C0392B",fontWeight:600}}>{digitalBooksError}</div>
+        ) : (collectionBooksError || digitalBooksError) ? (
+          <div style={{textAlign:"center",padding:"40px 0",color:"#C0392B",fontWeight:600}}>{collectionBooksError || digitalBooksError}</div>
         ) : (bks.length===0) ? (
-          <div style={{textAlign:"center",padding:"40px 0",color:"#777",fontWeight:600}}>No books available for this category from backend yet. (Collection ID: {String(col.id)})</div>
+          <div style={{textAlign:"center",padding:"40px 0",color:"#777",fontWeight:600}}>{isP&&modeKind?`No ${modeKind} books available in this category yet.`:"No books available for this category from backend yet."}</div>
         ) : (
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(250px,1fr))",gap:28}}>
-            {bks.map(b=><BookCard3D key={b.id} b={b} col={col} isP={isP||b.is_personalized} onClick={()=>{if(b.is_personalized){setPersonalizeBook({...b,collection:col})}else if(isP){setPModal({book:b,collection:col})}else setBook({...b,collection:col})}}/>)}
+            {bks.map(b=>{
+              const bIsP=!!b.is_personalized||String(b.book_type||"").trim().toLowerCase().includes("personal");
+              return <BookCard3D key={b.id} b={b} col={col} isP={bIsP} onClick={()=>{if(bIsP){setPersonalizeBook({...b,collection:col})}else setBook({...b,collection:col})}}/>;
+            })}
           </div>
         )}
       </div>
@@ -660,14 +870,18 @@ export default function App(){
     const handleSubmit=async()=>{
       if(!form.child_name.trim()||!form.child_age||!form.child_gender||!form.parent_email.trim()){setError("Please fill all required fields.");return;}
       if(photos.length===0){setError("Please upload at least one photo.");return;}
+      const parsedAge=Number.parseInt(String(form.child_age||"").trim(),10);
+      if(!Number.isInteger(parsedAge)||parsedAge<1||parsedAge>18){setError("Child age must be a whole number between 1 and 18.");return;}
       setLoading(true);setError("");
       try{
+        const isStoryType=/story|tale/i.test(`${b?.collection?.id||""} ${b?.collection?.name||""} ${b?.book_type||""}`);
         await initiatePersonalizedBookOrder({
           child_name:form.child_name.trim(),
-          child_age:Number(form.child_age),
+          child_age:parsedAge,
           child_gender:form.child_gender,
           parent_email:form.parent_email.trim(),
           whatsapp_number:form.whatsapp_number.trim()||undefined,
+          template_type:isStoryType?"story_book":"coloring_book",
           photos:Array.from(photos),
         });
         setSuccess(true);
@@ -758,7 +972,6 @@ export default function App(){
           <h2 style={{fontFamily:"'Baloo 2',cursive",fontSize:"1.4rem",color:D,margin:"0 0 4px"}}>{b.title}</h2>
           <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:12}}><Stars r={b.rat}/><span style={{fontSize:".85rem",fontWeight:700,color:"#444"}}>{b.rat}</span><span style={{fontSize:".8rem",color:"#aaa"}}>({b.rev} reviews)</span></div>
           <p style={{fontSize:".92rem",color:"#666",lineHeight:1.7,marginBottom:20}}>{b.desc}</p>
-          {b.tags?.length>0&&<div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:14}}>{b.tags.map((tag)=><span key={tag} style={{background:`${c.color}15`,color:c.color,padding:"3px 10px",borderRadius:999,fontSize:".7rem",fontWeight:700}}>{tag}</span>)}</div>}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:22}}>
             {[["Collection",c.name,c.emoji],["Style",b.style || "Standard","🎨"],["Age",b.age || "All ages","👶"],["Pages",`${b.pages}${b.pages===1?" board":" pg"}`,"📄"]].map(([l,v,ic])=><div key={l} style={{background:"#F8F5FF",borderRadius:12,padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:18}}>{ic}</span><div><div style={{fontSize:".68rem",color:"#bbb",fontWeight:600,textTransform:"uppercase"}}>{l}</div><div style={{fontSize:".85rem",fontWeight:700,color:"#333"}}>{v}</div></div></div>)}
           </div>
@@ -878,7 +1091,7 @@ export default function App(){
             }} style={{width:"100%",background:`linear-gradient(135deg,${R},#6C5CE7)`,color:"#fff",border:"none",padding:14,borderRadius:14,fontFamily:"'Baloo 2',cursive",fontSize:"1.05rem",fontWeight:700,cursor:"pointer"}}>💳 Pay ₹{totalAmount.toFixed(2)}</button>
           </div>
         </>:
-        <div style={{padding:"48px 26px",textAlign:"center"}}><div style={{fontSize:56,marginBottom:10,animation:"popIn .6s cubic-bezier(.68,-.55,.265,1.55)"}}>🎉</div><h2 style={{fontFamily:"'Baloo 2',cursive",fontSize:"1.5rem",color:D,marginBottom:6}}>Order Placed!</h2><p style={{fontSize:".92rem",color:"#666",lineHeight:1.7,marginBottom:8}}><strong>{b.title}</strong> — downloads have been triggered automatically.</p><p style={{fontSize:".84rem",color:"#666",lineHeight:1.6,marginBottom:18}}>Book PDF and cover image are downloaded. Invoice is sent to your registered email via Razorpay.</p><div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}><Btn onClick={()=>{resetCk();go("collections")}}>Browse More</Btn><Btn bg={W}>💬 Join Community</Btn></div></div>}
+        <div style={{padding:"48px 26px",textAlign:"center"}}><div style={{fontSize:56,marginBottom:10,animation:"popIn .6s cubic-bezier(.68,-.55,.265,1.55)"}}>🎉</div><h2 style={{fontFamily:"'Baloo 2',cursive",fontSize:"1.5rem",color:D,marginBottom:6}}>Order Placed!</h2><p style={{fontSize:".92rem",color:"#666",lineHeight:1.7,marginBottom:8}}><strong>{b.title}</strong> — downloads have been triggered automatically.</p><p style={{fontSize:".84rem",color:"#666",lineHeight:1.6,marginBottom:18}}>Book PDF and cover image are downloaded. Invoice is sent to your registered email via Razorpay.</p><div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}><Btn onClick={()=>{resetCk();go("collections")}}>Browse More</Btn><Btn bg={W}><WhatsAppIcon size={16} color="#fff" /> Join Community</Btn></div></div>}
       </div>
     </div>;
   };
@@ -934,15 +1147,18 @@ export default function App(){
               {pError&&<div style={{marginBottom:10,color:"#C0392B",fontSize:".82rem",fontWeight:700,background:"#FFF0F0",borderRadius:10,padding:"8px 12px"}}>{pError}</div>}
               <div style={{display:"flex",gap:8}}><button onClick={()=>setPStep(2)} style={{flex:1,padding:11,borderRadius:12,border:"2px solid #E8E0F0",background:"#fff",fontFamily:"inherit",fontWeight:700,cursor:"pointer",fontSize:".88rem",color:"#666"}}>← Back</button><Btn bg={W} onClick={async()=>{
                 if(!pForm.theme){setPError("Please choose a theme.");return;}
+                const parsedAge=Number.parseInt(String(pForm.age||"").trim(),10);
+                if(!Number.isInteger(parsedAge)||parsedAge<1||parsedAge>18){setPError("Age must be a whole number between 1 and 18.");return;}
                 const genderMap={"Girl 👧":"female","Boy 👦":"male","Other":"other"};
                 setPSubmitting(true);setPError("");
                 try{
                   await initiatePersonalizedBookOrder({
                     child_name:pForm.name,
-                    child_age:Number(pForm.age),
+                    child_age:parsedAge,
                     child_gender:genderMap[pForm.gender]||"other",
                     parent_email:pForm.email,
                     whatsapp_number:pForm.phone||undefined,
+                    template_type:isStory?"story_book":"coloring_book",
                     selected_theme_name:pForm.theme||undefined,
                     photos:pForm.photoFile?[pForm.photoFile]:[],
                   });
@@ -991,6 +1207,7 @@ export default function App(){
     {pg==="home"&&Home()}
     {pg==="collections"&&Store()}
     {pg==="products"&&Products()}
+    {pg==="p-store"&&PersonalizedStore()}
     {pg==="collection"&&Collection()}
     {BookM()}{CkM()}{PM()}{AuthM()}{WA()}
     {personalizeBook&&<PersonalizeModal book={personalizeBook} onClose={()=>setPersonalizeBook(null)}/>}

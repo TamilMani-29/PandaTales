@@ -66,6 +66,12 @@ const button = {
 
 const PAYMENT_STATUS_OPTIONS = ["pending", "paid", "failed"];
 const ORDER_STATUS_OPTIONS = ["queued", "processing", "completed", "failed", "cancelled"];
+const BOOK_TYPE_OPTIONS = [
+  "digital coloring book",
+  "digital story book",
+  "personalized coloring book",
+  "personalised story book",
+];
 
 const modalBackdrop = {
   position: "fixed",
@@ -112,6 +118,10 @@ function titleCase(value) {
   return String(value || "")
     .replace(/_/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function isPersonalizedBookType(bookType) {
+  return String(bookType || "").toLowerCase().includes("personal");
 }
 
 function AdminModal({ title, onClose, children }) {
@@ -163,8 +173,6 @@ export default function AdminPage() {
   const [bookForm, setBookForm] = useState({
     book_name: "",
     description: "",
-    book_tag: "",
-    book_tags: "",
     category_id: "",
     emoji: "",
     total_pages: "",
@@ -174,8 +182,7 @@ export default function AdminPage() {
     total_ratings: "0",
     download_count: "0",
     is_bestseller: false,
-    is_personalized: false,
-    book_type: "story",
+    book_type: "digital story book",
     theme: "human",
     language: "english",
   });
@@ -186,7 +193,7 @@ export default function AdminPage() {
     book_file: null,
   });
   const [bookAttributeOptions, setBookAttributeOptions] = useState({
-    book_type: ["story", "coloring"],
+    book_type: BOOK_TYPE_OPTIONS,
     theme: ["human"],
     language: ["english"],
     genre: ["fantasy"],
@@ -225,7 +232,7 @@ export default function AdminPage() {
       setCategories(Array.isArray(catRows) ? catRows : []);
       setBooks(Array.isArray(bookRows) ? bookRows : []);
       setBookAttributeOptions({
-        book_type: Array.isArray(attrOptions?.book_type) && attrOptions.book_type.length ? attrOptions.book_type : ["story", "coloring"],
+        book_type: BOOK_TYPE_OPTIONS,
         theme: Array.isArray(attrOptions?.theme) && attrOptions.theme.length ? attrOptions.theme : ["human"],
         language: Array.isArray(attrOptions?.language) && attrOptions.language.length ? attrOptions.language : ["english"],
         genre: Array.isArray(attrOptions?.genre) && attrOptions.genre.length ? attrOptions.genre : ["fantasy"],
@@ -376,8 +383,6 @@ export default function AdminPage() {
     setBookForm({
       book_name: "",
       description: "",
-      book_tag: "",
-      book_tags: "",
       category_id: "",
       emoji: "",
       total_pages: "",
@@ -387,8 +392,7 @@ export default function AdminPage() {
       total_ratings: "0",
       download_count: "0",
       is_bestseller: false,
-      is_personalized: false,
-      book_type: getDefaultOption("book_type", "story"),
+      book_type: getDefaultOption("book_type", "digital story book"),
       theme: getDefaultOption("theme", "human"),
       language: getDefaultOption("language", "english"),
     });
@@ -403,8 +407,6 @@ export default function AdminPage() {
     setBookForm({
       book_name: b.book_name || b.title || "",
       description: b.description || b.desc || "",
-      book_tag: b.book_tag || "",
-      book_tags: Array.isArray(b.book_tags) ? b.book_tags.join(", ") : "",
       category_id: b.category_id ? String(b.category_id) : "",
       emoji: b.emoji || "",
       total_pages: b.total_pages != null ? String(b.total_pages) : b.pages != null ? String(b.pages) : "",
@@ -414,8 +416,7 @@ export default function AdminPage() {
       total_ratings: b.total_ratings != null ? String(b.total_ratings) : b.rev != null ? String(b.rev) : "0",
       download_count: b.download_count != null ? String(b.download_count) : "0",
       is_bestseller: !!b.is_bestseller,
-      is_personalized: !!b.is_personalized,
-      book_type: b.book_type || "story",
+      book_type: b.book_type || "digital story book",
       theme: b.theme || "human",
       language: b.language || "english",
     });
@@ -429,8 +430,9 @@ export default function AdminPage() {
     setActionMsg("");
     setBookModalMsg("");
     try {
+      const derivedIsPersonalized = isPersonalizedBookType(bookForm.book_type);
       if (bookMode === "add") {
-        if (!bookFiles.cover_image || (!bookFiles.book_file && !bookForm.is_personalized)) {
+        if (!bookFiles.cover_image || (!bookFiles.book_file && !derivedIsPersonalized)) {
           const msg = !bookFiles.cover_image
             ? "❌ Cover image is required"
             : "❌ PDF is required for non-personalized books";
@@ -442,8 +444,6 @@ export default function AdminPage() {
         const fd = new FormData();
         fd.append("book_name", bookForm.book_name);
         fd.append("description", bookForm.description || "");
-        if (bookForm.book_tag) fd.append("book_tag", bookForm.book_tag);
-        fd.append("book_tags", bookForm.book_tags || "");
         if (bookForm.category_id) fd.append("category_id", String(Number(bookForm.category_id)));
         fd.append("emoji", bookForm.emoji || "");
         if (bookForm.total_pages) fd.append("total_pages", String(Number(bookForm.total_pages)));
@@ -456,7 +456,7 @@ export default function AdminPage() {
         if (bookForm.total_ratings) fd.append("total_ratings", String(Number(bookForm.total_ratings)));
         if (bookForm.download_count) fd.append("download_count", String(Number(bookForm.download_count)));
         fd.append("is_bestseller", String(!!bookForm.is_bestseller));
-        fd.append("is_personalized", String(!!bookForm.is_personalized));
+        fd.append("is_personalized", String(derivedIsPersonalized));
         fd.append("cover_image", bookFiles.cover_image);
         if (bookFiles.front_image) fd.append("front_image", bookFiles.front_image);
         if (bookFiles.back_image) fd.append("back_image", bookFiles.back_image);
@@ -467,8 +467,6 @@ export default function AdminPage() {
         const payload = {
           book_name: bookForm.book_name || undefined,
           description: bookForm.description,
-          book_tag: bookForm.book_tag || undefined,
-          book_tags: csvToArray(bookForm.book_tags),
           category_id: bookForm.category_id ? Number(bookForm.category_id) : undefined,
           emoji: bookForm.emoji || undefined,
           total_pages: bookForm.total_pages ? Number(bookForm.total_pages) : undefined,
@@ -478,7 +476,7 @@ export default function AdminPage() {
           total_ratings: bookForm.total_ratings ? Number(bookForm.total_ratings) : undefined,
           download_count: bookForm.download_count ? Number(bookForm.download_count) : undefined,
           is_bestseller: !!bookForm.is_bestseller,
-          is_personalized: !!bookForm.is_personalized,
+          is_personalized: derivedIsPersonalized,
           book_type: bookForm.book_type,
           theme: bookForm.theme,
           language: bookForm.language,
@@ -1102,22 +1100,9 @@ export default function AdminPage() {
                 <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Emoji</label>
                 <input style={inputStyle} placeholder="📖" value={bookForm.emoji} onChange={(e) => setBookForm((s) => ({ ...s, emoji: e.target.value }))} />
               </div>
-              <div style={{ display: "grid", gap: 6 }}>
-                <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Book Tag (single, max 80)</label>
-                <input style={inputStyle} placeholder="e.g. bestseller" maxLength={80} value={bookForm.book_tag} onChange={(e) => setBookForm((s) => ({ ...s, book_tag: e.target.value }))} />
-              </div>
-              <div style={{ display: "grid", gap: 6, gridColumn: "1/-1" }}>
-                <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Book Tags (comma separated)</label>
-                <input style={inputStyle} placeholder="bedtime, adventure" value={bookForm.book_tags} onChange={(e) => setBookForm((s) => ({ ...s, book_tags: e.target.value }))} />
-              </div>
               <div style={{ gridColumn: "1/-1" }}>
                 <label style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, color: "#5b4f7c", fontSize: 13, cursor: "pointer" }}>
                   <input type="checkbox" checked={bookForm.is_bestseller} onChange={(e) => setBookForm((s) => ({ ...s, is_bestseller: e.target.checked }))} /> Mark as Bestseller ⭐
-                </label>
-              </div>
-              <div style={{ gridColumn: "1/-1" }}>
-                <label style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, color: "#2563EB", fontSize: 13, cursor: "pointer" }}>
-                  <input type="checkbox" checked={bookForm.is_personalized} onChange={(e) => setBookForm((s) => ({ ...s, is_personalized: e.target.checked }))} /> 🧸 Personalized Book (PDF generated per customer order)
                 </label>
               </div>
             </div>
@@ -1128,7 +1113,7 @@ export default function AdminPage() {
                   <input type="file" accept="image/*" style={inputStyle} onChange={(e) => setBookFiles((s) => ({ ...s, cover_image: e.target.files?.[0] || null }))} />
                 </div>
                 <div style={{ display: "grid", gap: 6 }}>
-                  <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Book PDF {bookForm.is_personalized ? <span style={{ color: "#2563EB" }}>(optional — generated per order)</span> : <span style={{ color: "#b00020" }}>(required)</span>}</label>
+                  <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Book PDF {isPersonalizedBookType(bookForm.book_type) ? <span style={{ color: "#2563EB" }}>(optional — generated per order)</span> : <span style={{ color: "#b00020" }}>(required)</span>}</label>
                   <input type="file" accept="application/pdf" style={inputStyle} onChange={(e) => setBookFiles((s) => ({ ...s, book_file: e.target.files?.[0] || null }))} />
                 </div>
                 <div style={{ display: "grid", gap: 6 }}>
@@ -1160,7 +1145,7 @@ export default function AdminPage() {
             {optionsMsg && (
               <div style={{ padding: "8px 14px", borderRadius: 10, background: optionsMsg.startsWith("✅") ? "#F0FDF4" : "#FEF2F2", color: optionsMsg.startsWith("✅") ? "#166534" : "#b91c1c", fontWeight: 600, fontSize: 13 }}>{optionsMsg}</div>
             )}
-            {[["book_type", "📘 Book Type"], ["genre", "🎭 Genre"], ["theme", "🎨 Theme"], ["language", "🌐 Language"]].map(([type, label]) => (
+            {[["genre", "🎭 Genre"], ["theme", "🎨 Theme"], ["language", "🌐 Language"]].map(([type, label]) => (
               <div key={type} style={{ background: "#FAFAFA", borderRadius: 14, padding: "16px 18px", border: "1px solid #E5E7EB" }}>
                 <div style={{ fontWeight: 700, color: "#374151", fontSize: 14, marginBottom: 10 }}>{label}</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>

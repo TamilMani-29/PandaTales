@@ -137,7 +137,7 @@ class GeneratedBookService:
         # Create generation record
         book = GeneratedBook(
             user_id=user_id,
-            template_type="coloring_book",
+            template_type=data.template_type,
             template_id=template_id,
             generation_type="photo_to_coloring",
             child_id=child_id,

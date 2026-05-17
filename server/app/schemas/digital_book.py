@@ -12,8 +12,6 @@ class DigitalBookCreateRequest(BaseModel):
 
     book_name: str = Field(..., min_length=1, max_length=255)
     description: str | None = None
-    book_tag: str | None = Field(None, max_length=80)
-    book_tags: list[str] | None = None
     category_id: int | None = Field(None, ge=1)
     emoji: str | None = Field(None, max_length=16)
     total_pages: int | None = Field(None, ge=1)
@@ -34,8 +32,6 @@ class DigitalBookUpdateRequest(BaseModel):
 
     book_name: str | None = Field(None, min_length=1, max_length=255)
     description: str | None = None
-    book_tag: str | None = Field(None, max_length=80)
-    book_tags: list[str] | None = None
     category_id: int | None = Field(None, ge=1)
     emoji: str | None = Field(None, max_length=16)
     total_pages: int | None = Field(None, ge=1)
@@ -103,8 +99,6 @@ class DigitalBookResponse(BaseModel):
     id: int
     book_name: str
     description: str | None
-    book_tag: str | None
-    book_tags: list[str]
     category_id: int | None
     category: int | None       # alias for category_id
     category_name: str | None
@@ -114,6 +108,7 @@ class DigitalBookResponse(BaseModel):
     emoji: str | None
     is_bestseller: bool
     is_personalized: bool
+    personalized_kind: str | None
     cover_image_url: str | None
     cover_image_presigned_url: str | None
     front_image_url: str | None

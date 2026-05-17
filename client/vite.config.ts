@@ -11,6 +11,11 @@ export default defineConfig({
         target: process.env.VITE_PROXY_TARGET || 'http://localhost:8000',
         changeOrigin: true,
       },
+      '/minio': {
+        target: process.env.VITE_MINIO_PROXY_TARGET || 'http://localhost:9000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/minio/, ''),
+      },
     },
   },
   optimizeDeps: {

@@ -22,7 +22,6 @@ class Book(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     book_name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    book_tag: Mapped[str | None] = mapped_column(String(80), nullable=True)
     category_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     emoji: Mapped[str | None] = mapped_column(String(16), nullable=True)
     cover_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)

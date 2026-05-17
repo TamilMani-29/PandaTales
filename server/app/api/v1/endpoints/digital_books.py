@@ -28,8 +28,6 @@ router = APIRouter(prefix="/digital-books", tags=["Digital Books"])
 async def create_digital_book(
     book_name: str = Form(..., min_length=1, max_length=255),
     description: str | None = Form(None),
-    book_tag: str | None = Form(None, max_length=80),
-    book_tags: str | None = Form(None, description="Comma-separated tags (e.g. bestseller, personalised, customized)"),
     category_id: int | None = Form(None, ge=1),
     emoji: str | None = Form(None, max_length=16),
     total_pages: int | None = Form(None, ge=1),
@@ -53,8 +51,6 @@ async def create_digital_book(
     payload = DigitalBookCreateRequest(
         book_name=book_name,
         description=description,
-        book_tag=book_tag,
-        book_tags=[item.strip() for item in (book_tags or "").split(",") if item.strip()] or None,
         category_id=category_id,
         emoji=emoji,
         total_pages=total_pages,

@@ -70,6 +70,7 @@ class PhotoToColoringGenerationCreate(BaseModel):
     
     # Optional theme selection (e.g. from personalized flow)
     selected_theme_name: str | None = Field(None, max_length=100)
+    template_type: Literal["story_book", "coloring_book"] = "coloring_book"
 
     # Processing options
     line_weight: Literal["thin", "medium", "thick"] = "medium"

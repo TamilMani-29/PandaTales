@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common import BadRequestException, UnauthorizedException, success_response
@@ -152,7 +152,12 @@ async def admin_list_personalized_orders(
 
     query = (
         select(GeneratedBook)
-        .where(GeneratedBook.generation_type == "photo_to_coloring")
+        .where(
+            or_(
+                GeneratedBook.template_type == "story_book",
+                GeneratedBook.template_type == "coloring_book",
+            )
+        )
         .order_by(GeneratedBook.created_at.desc())
         .limit(safe_limit)
     )
@@ -188,6 +193,7 @@ async def admin_list_personalized_orders(
                 "whatsapp_number": book.whatsapp_number,
                 "payment_status": book.payment_status,
                 "order_status": book.status,
+                "template_type": book.template_type,
                 "generation_type": book.generation_type,
                 "selected_theme_name": book.selected_theme_name,
                 "is_purchased": bool(book.is_purchased),
