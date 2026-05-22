@@ -408,25 +408,34 @@ class DigitalBookService:
 
         result = await self.db.execute(query)
         rows = result.scalars().all()
-        return [
-            {
-                "id": row.id,
-                "category_id": row.category_id,
-                "name": row.name,
-                "tags": self._split_tags(row.personalized_tag),
-                "personalized_tag": row.personalized_tag,
-                "description": row.description,
-                "emoji": row.emoji,
-                "color": row.color,
-                "grad": row.grad,
-                "personalized": row.personalized,
-                "is_active": row.is_active,
-                "label": row.label,
-            }
-            for row in rows
-        ]
+        response_rows: list[dict] = []
+        for row in rows:
+            category_image_presigned_url = await self._presign_category_image_url(
+                row.category_image_url,
+                row.category_id,
+            )
+            response_rows.append(
+                {
+                    "id": row.id,
+                    "category_id": row.category_id,
+                    "name": row.name,
+                    "tags": self._split_tags(row.personalized_tag),
+                    "personalized_tag": row.personalized_tag,
+                    "description": row.description,
+                    "category_image_url": row.category_image_url,
+                    "category_image_presigned_url": category_image_presigned_url,
+                    "emoji": row.emoji,
+                    "color": row.color,
+                    "grad": row.grad,
+                    "personalized": row.personalized,
+                    "is_active": row.is_active,
+                    "label": row.label,
+                    "category_type": row.category_type,
+                }
+            )
+        return response_rows
 
-    async def create_or_update_category(self, payload: BookCategoryCreateRequest) -> dict:
+    async def create_or_update_category(self, payload: BookCategoryCreateRequest, category_image=None) -> dict:
         """Create category metadata or update existing by category_id.
         """
         requested_id = payload.category_id
@@ -444,6 +453,8 @@ class DigitalBookService:
         )
         row = result.scalar_one_or_none()
 
+        old_category_image_url: str | None = None
+
         if row is None:
             normalized_category_tag = self._merge_tags_to_storage(payload.tags, None)
             row = BookCategory(
@@ -452,11 +463,13 @@ class DigitalBookService:
                 personalized_tag=normalized_category_tag,
                 label=payload.label,
                 description=payload.description,
+            category_image_url=getattr(payload, "category_image_url", None),
                 emoji=payload.emoji,
                 color=payload.color,
                 grad=payload.grad,
                 personalized=payload.personalized,
                 is_active=payload.is_active,
+                category_type=getattr(payload, "category_type", None),
             )
             self.db.add(row)
         else:
@@ -472,18 +485,57 @@ class DigitalBookService:
                     "Cannot change category type because existing books in this category use the opposite type"
                 )
 
+            old_category_image_url = row.category_image_url
             row.name = payload.name.strip()
             row.personalized_tag = self._merge_tags_to_storage(payload.tags, None)
             row.label = payload.label
             row.description = payload.description
+            if getattr(payload, "category_image_url", None) is not None:
+                row.category_image_url = payload.category_image_url
             row.emoji = payload.emoji
             row.color = payload.color
             row.grad = payload.grad
             row.personalized = payload.personalized
             row.is_active = payload.is_active
+            row.category_type = getattr(payload, "category_type", None)
+
+        if category_image is not None:
+            content_type = getattr(category_image, "content_type", None) or ""
+            if not str(content_type).startswith("image/"):
+                raise BadRequestException("category_image must be an image file")
+
+            file_ext = Path(getattr(category_image, "filename", "") or "").suffix.lower() or ".jpg"
+            slug = slugify(payload.name) or f"category-{normalized_id}"
+            object_name = f"digital-books/category-images/{slug}-{normalized_id}-{uuid4().hex[:8]}{file_ext}"
+            await self.storage.upload_file(
+                file=category_image,
+                object_name=object_name,
+                content_type=content_type,
+                max_size_mb=10,
+            )
+            row.category_image_url = object_name
 
         await self.db.commit()
         await self.db.refresh(row)
+
+        if (
+            old_category_image_url
+            and row.category_image_url
+            and old_category_image_url != row.category_image_url
+        ):
+            try:
+                await self.storage.delete_file(old_category_image_url)
+            except Exception:
+                logger.warning(
+                    "category_image_delete_old_failed",
+                    category_id=row.category_id,
+                    object_name=old_category_image_url,
+                )
+
+        category_image_presigned_url = await self._presign_category_image_url(
+            row.category_image_url,
+            row.category_id,
+        )
 
         return {
             "id": row.id,
@@ -493,11 +545,14 @@ class DigitalBookService:
             "personalized_tag": row.personalized_tag,
             "label": row.label,
             "description": row.description,
+            "category_image_url": row.category_image_url,
+            "category_image_presigned_url": category_image_presigned_url,
             "emoji": row.emoji,
             "color": row.color,
             "grad": row.grad,
             "personalized": row.personalized,
             "is_active": row.is_active,
+            "category_type": row.category_type,
         }
 
     async def add_book_category(self, book_id: int, category_id: int) -> dict:
@@ -1878,6 +1933,33 @@ class DigitalBookService:
                 "digital_book_presign_failed",
                 book_id=book_id,
                 image_kind=image_kind,
+                object_name=object_name,
+            )
+            return None
+
+    async def _presign_category_image_url(
+        self,
+        object_name: str | None,
+        category_id: int,
+    ) -> str | None:
+        if not object_name:
+            return None
+
+        public_base = (settings.MINIO_PUBLIC_BASE_URL or "").strip().rstrip("/")
+        if public_base:
+            object_path = str(object_name).lstrip("/")
+            return f"{public_base}/{settings.MINIO_BUCKET}/{object_path}"
+
+        try:
+            return await self.storage.get_file_url(
+                object_name,
+                expires=timedelta(hours=6),
+                check_exists=False,
+            )
+        except Exception:
+            logger.warning(
+                "category_image_presign_failed",
+                category_id=category_id,
                 object_name=object_name,
             )
             return None

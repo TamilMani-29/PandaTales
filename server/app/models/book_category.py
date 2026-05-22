@@ -19,11 +19,13 @@ class BookCategory(Base):
     personalized_tag: Mapped[str | None] = mapped_column(String(160), nullable=True)
     label: Mapped[str | None] = mapped_column(String(80), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    category_image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     emoji: Mapped[str | None] = mapped_column(String(16), nullable=True)
     color: Mapped[str | None] = mapped_column(String(32), nullable=True)
     grad: Mapped[str | None] = mapped_column(Text, nullable=True)
     personalized: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    category_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

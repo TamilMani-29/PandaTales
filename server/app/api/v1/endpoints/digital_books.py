@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common import success_response
@@ -145,12 +145,60 @@ async def get_digital_book_categories(
     description="Upsert category metadata by category_id in book_categories table.",
 )
 async def create_or_update_digital_book_category(
-    payload: BookCategoryCreateRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """Create or update one category row."""
+    content_type = (request.headers.get("content-type") or "").lower()
+
+    def _parse_bool(raw: str | bool | None, default: bool) -> bool:
+        if raw is None:
+            return default
+        if isinstance(raw, bool):
+            return raw
+        value = str(raw).strip().lower()
+        if value in {"1", "true", "yes", "on"}:
+            return True
+        if value in {"0", "false", "no", "off"}:
+            return False
+        return default
+
+    payload: BookCategoryCreateRequest
+    category_image: UploadFile | None = None
+
+    if "multipart/form-data" in content_type:
+        form = await request.form()
+        raw_tags = form.get("tags")
+        parsed_tags: list[str] | None = None
+        if raw_tags is not None:
+            parsed_tags = [item.strip() for item in str(raw_tags).split(",") if item and item.strip()]
+
+        category_image_candidate = form.get("category_image")
+        category_image = (
+            category_image_candidate
+            if category_image_candidate is not None and hasattr(category_image_candidate, "filename")
+            else None
+        )
+        category_id_raw = form.get("category_id")
+        payload = BookCategoryCreateRequest(
+            category_id=int(str(category_id_raw)) if category_id_raw not in (None, "") else None,
+            name=str(form.get("name") or "").strip(),
+            tags=parsed_tags,
+            label=(str(form.get("label")).strip() if form.get("label") not in (None, "") else None),
+            description=(str(form.get("description")).strip() if form.get("description") not in (None, "") else None),
+            category_image_url=(str(form.get("category_image_url")).strip() if form.get("category_image_url") not in (None, "") else None),
+            emoji=(str(form.get("emoji")).strip() if form.get("emoji") not in (None, "") else None),
+            color=(str(form.get("color")).strip() if form.get("color") not in (None, "") else None),
+            grad=(str(form.get("grad")).strip() if form.get("grad") not in (None, "") else None),
+            personalized=_parse_bool(form.get("personalized"), False),
+            is_active=_parse_bool(form.get("is_active"), True),
+            category_type=(str(form.get("category_type")).strip() if form.get("category_type") not in (None, "") else None),
+        )
+    else:
+        payload = BookCategoryCreateRequest.model_validate(await request.json())
+
     service = DigitalBookService(db)
-    data = await service.create_or_update_category(payload)
+    data = await service.create_or_update_category(payload, category_image=category_image)
     return success_response(data=data, message="Digital book category saved successfully")
 
 

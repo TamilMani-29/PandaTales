@@ -62,11 +62,13 @@ class BookCategoryCreateRequest(BaseModel):
     tags: list[str] | None = None
     label: str | None = Field(None, max_length=80, description="Short badge label shown top-right on card (e.g. PERSONALIZED, NEW, BESTSELLER)")
     description: str | None = None
+    category_image_url: str | None = None
     emoji: str | None = Field(None, max_length=16)
     color: str | None = Field(None, max_length=32)
     grad: str | None = None
     personalized: bool = False
     is_active: bool = True
+    category_type: str | None = Field(None, max_length=50)
 
 
 class BookCategoryResponse(BaseModel):
@@ -79,11 +81,14 @@ class BookCategoryResponse(BaseModel):
     personalized_tag: str | None
     label: str | None
     description: str | None
+    category_image_url: str | None
+    category_image_presigned_url: str | None
     emoji: str | None
     color: str | None
     grad: str | None
     personalized: bool
     is_active: bool
+    category_type: str | None
 
 
 class BookAttributeOptionCreateRequest(BaseModel):

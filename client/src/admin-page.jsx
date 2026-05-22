@@ -124,6 +124,31 @@ function isPersonalizedBookType(bookType) {
   return String(bookType || "").toLowerCase().includes("personal");
 }
 
+function getExpectedCategoryTypeForBookType(bookType) {
+  const bt = String(bookType || "").trim().toLowerCase();
+  if (bt.startsWith("digital")) return "digital";
+  if (bt.includes("color") || bt.includes("colour")) return "personalized_coloring";
+  return "personalized_story";
+}
+
+function inferCategoryTypeForFiltering(category) {
+  const explicit = String(category?.category_type || "").trim().toLowerCase();
+  if (explicit) return explicit;
+
+  if (!category?.personalized) return "digital";
+
+  const text = [
+    category?.label || "",
+    category?.name || "",
+    Array.isArray(category?.tags) ? category.tags.join(" ") : (category?.tags || ""),
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  if (text.includes("coloring") || text.includes("colouring")) return "personalized_coloring";
+  return "personalized_story";
+}
+
 function AdminModal({ title, onClose, children }) {
   return (
     <div style={modalBackdrop} onClick={onClose}>
@@ -160,12 +185,16 @@ export default function AdminPage() {
     tags: "",
     label: "",
     description: "",
+    category_image_url: "",
     emoji: "",
     color: "",
     grad: "",
     personalized: false,
-    is_active: true,
-  });
+      is_active: true,
+      cat_type: "digital",
+    });
+  const [categoryImageFile, setCategoryImageFile] = useState(null);
+  const [categoryImagePreview, setCategoryImagePreview] = useState("");
 
   const [bookModalOpen, setBookModalOpen] = useState(false);
   const [bookMode, setBookMode] = useState("add");
@@ -219,6 +248,14 @@ export default function AdminPage() {
   const [personalizedLoading, setPersonalizedLoading] = useState(false);
   const [personalizedError, setPersonalizedError] = useState("");
   const [personalizedSavingId, setPersonalizedSavingId] = useState("");
+
+  useEffect(() => {
+    return () => {
+      if (categoryImagePreview && categoryImagePreview.startsWith("blob:")) {
+        URL.revokeObjectURL(categoryImagePreview);
+      }
+    };
+  }, [categoryImagePreview]);
 
   async function loadCatalog() {
     setCatalogLoading(true);
@@ -295,6 +332,25 @@ export default function AdminPage() {
     [payments]
   );
 
+  const expectedCategoryType = useMemo(
+    () => getExpectedCategoryTypeForBookType(bookForm.book_type),
+    [bookForm.book_type]
+  );
+
+  const filteredBookCategories = useMemo(
+    () => categories.filter((c) => inferCategoryTypeForFiltering(c) === expectedCategoryType),
+    [categories, expectedCategoryType]
+  );
+
+  useEffect(() => {
+    if (!bookForm.category_id) return;
+    const selectedId = String(bookForm.category_id);
+    const stillValid = filteredBookCategories.some((c) => String(c.category_id) === selectedId);
+    if (!stillValid) {
+      setBookForm((s) => ({ ...s, category_id: "" }));
+    }
+  }, [bookForm.category_id, filteredBookCategories]);
+
   async function handleLogin(e) {
     e.preventDefault();
     setLoadingLogin(true);
@@ -321,15 +377,20 @@ export default function AdminPage() {
         tags: csvToArray(categoryForm.tags),
         label: categoryForm.label || null,
         description: categoryForm.description || null,
+        category_image_url: categoryForm.category_image_url || null,
+        category_image: categoryImageFile,
         emoji: categoryForm.emoji || null,
         color: categoryForm.color || null,
         grad: categoryForm.grad || null,
         personalized: !!categoryForm.personalized,
         is_active: !!categoryForm.is_active,
+        category_type: categoryForm.cat_type === "personalized_coloring" ? "personalized_coloring" : categoryForm.cat_type === "personalized_story" ? "personalized_story" : "digital",
       });
       setActionMsg(categoryMode === "add" ? "✅ Category added" : "✅ Category updated");
       setCategoryModalOpen(false);
-      setCategoryForm({ category_id: "", name: "", tags: "", label: "", description: "", emoji: "", color: "", grad: "", personalized: false, is_active: true });
+      setCategoryImageFile(null);
+      setCategoryImagePreview("");
+      setCategoryForm({ category_id: "", name: "", tags: "", label: "", description: "", category_image_url: "", emoji: "", color: "", grad: "", personalized: false, is_active: true, cat_type: "digital" });
       await loadCatalog();
     } catch (err) {
       setActionMsg("❌ " + (err?.message || "Failed to save category"));
@@ -340,24 +401,43 @@ export default function AdminPage() {
 
   function openAddCategoryModal() {
     setCategoryMode("add");
-    setCategoryForm({ category_id: "", name: "", tags: "", label: "", description: "", emoji: "", color: "", grad: "", personalized: false, is_active: true });
+      setCategoryImageFile(null);
+      setCategoryImagePreview("");
+      setCategoryForm({ category_id: "", name: "", tags: "", label: "", description: "", category_image_url: "", emoji: "", color: "", grad: "", personalized: false, is_active: true, cat_type: "digital" });
     setCategoryModalOpen(true);
   }
 
   function openEditCategoryModal(cat) {
     setCategoryMode("edit");
+    const lbl = String(cat.label || "").toLowerCase();
+    let cat_type = cat.category_type || "";
+    if (!cat_type) {
+      if (!cat.personalized) {
+        cat_type = "digital";
+      } else if (lbl === "coloring" || lbl === "colouring" || lbl === "personalized_coloring") {
+        cat_type = "personalized_coloring";
+      } else if (lbl === "story" || lbl === "personalized_story") {
+        cat_type = "personalized_story";
+      } else {
+        cat_type = "personalized_story"; // fallback
+      }
+    }
     setCategoryForm({
       category_id: String(cat.category_id || ""),
       name: cat.name || "",
       tags: Array.isArray(cat.tags) ? cat.tags.join(", ") : "",
       label: cat.label || "",
       description: cat.description || "",
+      category_image_url: cat.category_image_url || "",
       emoji: cat.emoji || "",
       color: cat.color || "",
       grad: cat.grad || "",
       personalized: !!cat.personalized,
       is_active: !!cat.is_active,
+      cat_type,
     });
+    setCategoryImageFile(null);
+    setCategoryImagePreview(cat.category_image_presigned_url || cat.category_image_url || "");
     setCategoryModalOpen(true);
   }
 
@@ -733,6 +813,13 @@ export default function AdminPage() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
                 {categories.map((c) => (
                   <div key={c.category_id} style={{ border: "1px solid rgba(74,31,184,.14)", borderRadius: 16, padding: 14, background: "#fff", display: "flex", flexDirection: "column", gap: 6 }}>
+                    {c.category_image_presigned_url || c.category_image_url ? (
+                      <img
+                        src={c.category_image_presigned_url || c.category_image_url}
+                        alt={`${c.name} category`}
+                        style={{ width: "100%", height: 120, objectFit: "cover", borderRadius: 12, border: "1px solid rgba(74,31,184,.12)" }}
+                      />
+                    ) : null}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                       <div>
                         <div style={{ fontWeight: 800, fontSize: 16, color: D }}>{c.emoji} {c.name}</div>
@@ -982,13 +1069,34 @@ export default function AdminPage() {
               </div>
             ) : null}
             <div style={{ display: "grid", gap: 6 }}>
-              <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Name *</label>
-              <input style={inputStyle} required placeholder="Category Name" value={categoryForm.name} onChange={(e) => setCategoryForm((s) => ({ ...s, name: e.target.value }))} />
+                <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Category Type *</label>
+                <select
+                  style={{ ...inputStyle, fontWeight: 700 }}
+                  value={categoryForm.cat_type}
+                  onChange={(e) => {
+                    const t = e.target.value;
+                    const isP = t !== "digital";
+                    const lbl = t === "personalized_coloring" ? "coloring" : t === "personalized_story" ? "story" : "";
+                    setCategoryForm((s) => ({ ...s, cat_type: t, personalized: isP, label: lbl }));
+                  }}
+                >
+                  <option value="digital">📱 Digital (non-personalized)</option>
+                  <option value="personalized_story">📖 Personalized Story Book</option>
+                  <option value="personalized_coloring">🎨 Personalized Coloring Book</option>
+                </select>
             </div>
+              <div style={{ display: "grid", gap: 6 }}>
+                <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Name *</label>
+                <input style={inputStyle} required placeholder="Category Name" value={categoryForm.name} onChange={(e) => setCategoryForm((s) => ({ ...s, name: e.target.value }))} />
+              </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
               <div style={{ display: "grid", gap: 6 }}>
-                <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Label</label>
-                <input style={inputStyle} placeholder="Label" value={categoryForm.label} onChange={(e) => setCategoryForm((s) => ({ ...s, label: e.target.value }))} />
+                  <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>{categoryForm.cat_type === "digital" ? "Label (badge)" : "Kind"}</label>
+                  {categoryForm.cat_type === "digital" ? (
+                    <input style={inputStyle} placeholder="e.g. NEW, BESTSELLER" value={categoryForm.label} onChange={(e) => setCategoryForm((s) => ({ ...s, label: e.target.value }))} />
+                  ) : (
+                    <input style={{ ...inputStyle, background: "#f5f3ff", color: "#6b21a8", fontWeight: 700 }} value={categoryForm.cat_type === "personalized_coloring" ? "🎨 Coloring Book" : "📖 Story Book"} readOnly />
+                  )}
               </div>
               <div style={{ display: "grid", gap: 6 }}>
                 <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Emoji</label>
@@ -1011,10 +1119,32 @@ export default function AdminPage() {
               <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Description</label>
               <textarea style={{ ...inputStyle, minHeight: 70 }} placeholder="Short description..." value={categoryForm.description} onChange={(e) => setCategoryForm((s) => ({ ...s, description: e.target.value }))} />
             </div>
+            <div style={{ display: "grid", gap: 6 }}>
+              <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Category Image</label>
+              <input
+                type="file"
+                accept="image/*"
+                style={inputStyle}
+                onChange={(e) => {
+                  const file = e.target.files?.[0] || null;
+                  setCategoryImageFile(file);
+                  if (file) {
+                    setCategoryImagePreview(URL.createObjectURL(file));
+                  }
+                }}
+              />
+              {(categoryImagePreview || categoryForm.category_image_url) ? (
+                <div style={{ display: "grid", gap: 6 }}>
+                  <img
+                    src={categoryImagePreview || categoryForm.category_image_url}
+                    alt="Category preview"
+                    style={{ width: "100%", maxWidth: 260, height: 140, objectFit: "cover", borderRadius: 12, border: "1px solid rgba(74,31,184,.15)" }}
+                  />
+                  {categoryImageFile ? <span style={{ fontSize: 12, color: "#6b5d92" }}>New image selected: {categoryImageFile.name}</span> : null}
+                </div>
+              ) : null}
+            </div>
             <div style={{ display: "flex", gap: 16 }}>
-              <label style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>
-                <input type="checkbox" checked={categoryForm.personalized} onChange={(e) => setCategoryForm((s) => ({ ...s, personalized: e.target.checked }))} /> Personalized
-              </label>
               <label style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>
                 <input type="checkbox" checked={categoryForm.is_active} onChange={(e) => setCategoryForm((s) => ({ ...s, is_active: e.target.checked }))} /> Active
               </label>
@@ -1073,8 +1203,15 @@ export default function AdminPage() {
                 <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Category (by ID)</label>
                 <select style={inputStyle} value={bookForm.category_id} onChange={(e) => setBookForm((s) => ({ ...s, category_id: e.target.value }))}>
                   <option value="">— None —</option>
-                  {categories.map((c) => <option key={c.category_id} value={String(c.category_id)}>{c.emoji} {c.name}</option>)}
+                  {filteredBookCategories.map((c) => <option key={c.category_id} value={String(c.category_id)}>{c.emoji} {c.name}</option>)}
                 </select>
+                <span style={{ fontSize: 11, color: "#8B5CF6" }}>
+                  {expectedCategoryType === "digital"
+                    ? "Showing digital categories only"
+                    : expectedCategoryType === "personalized_coloring"
+                      ? "Showing personalized coloring categories only"
+                      : "Showing personalized story categories only"}
+                </span>
               </div>
               <div style={{ display: "grid", gap: 6 }}>
                 <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Price (₹)</label>
@@ -1117,7 +1254,7 @@ export default function AdminPage() {
                   <input type="file" accept="application/pdf" style={inputStyle} onChange={(e) => setBookFiles((s) => ({ ...s, book_file: e.target.files?.[0] || null }))} />
                 </div>
                 <div style={{ display: "grid", gap: 6 }}>
-                  <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Front Image (optional)</label>
+                  <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Front Image <span style={{ color: "#2563EB" }}>(shown on card)</span></label>
                   <input type="file" accept="image/*" style={inputStyle} onChange={(e) => setBookFiles((s) => ({ ...s, front_image: e.target.files?.[0] || null }))} />
                 </div>
                 <div style={{ display: "grid", gap: 6 }}>

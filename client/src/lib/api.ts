@@ -145,11 +145,14 @@ export type DigitalBookCategory = {
   personalized_tag?: string | null;
   label?: string | null;
   description?: string | null;
+  category_image_url?: string | null;
+  category_image_presigned_url?: string | null;
   emoji?: string | null;
   color?: string | null;
   grad?: string | null;
   personalized: boolean;
   is_active: boolean;
+  category_type?: string | null;
 };
 
 export async function getDigitalBookCategories() {
@@ -412,15 +415,39 @@ export async function upsertDigitalBookCategory(input: {
   tags?: string[];
   label?: string | null;
   description?: string | null;
+  category_image_url?: string | null;
+  category_image?: File | null;
   emoji?: string | null;
   color?: string | null;
   grad?: string | null;
   personalized?: boolean;
   is_active?: boolean;
+  category_type?: string | null;
 }) {
+  const formData = new FormData();
+  if (typeof input.category_id === "number") {
+    formData.append("category_id", String(input.category_id));
+  }
+  formData.append("name", input.name);
+  if (Array.isArray(input.tags) && input.tags.length > 0) {
+    formData.append("tags", input.tags.join(","));
+  }
+  if (input.label != null) formData.append("label", input.label);
+  if (input.description != null) formData.append("description", input.description);
+  if (input.category_image_url != null) formData.append("category_image_url", input.category_image_url);
+  if (input.emoji != null) formData.append("emoji", input.emoji);
+  if (input.color != null) formData.append("color", input.color);
+  if (input.grad != null) formData.append("grad", input.grad);
+  if (typeof input.personalized === "boolean") formData.append("personalized", String(input.personalized));
+  if (typeof input.is_active === "boolean") formData.append("is_active", String(input.is_active));
+  if (input.category_type != null) formData.append("category_type", input.category_type);
+  if (input.category_image) {
+    formData.append("category_image", input.category_image);
+  }
+
   return request<DigitalBookCategory>("/api/v1/digital-books/categories", {
     method: "POST",
-    body: JSON.stringify(input),
+    body: formData,
   });
 }
 
