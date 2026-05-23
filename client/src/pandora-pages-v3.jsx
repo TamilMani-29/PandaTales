@@ -554,7 +554,7 @@ export default function App(){
           </h1>
           <p style={{fontSize:"1.08rem",color:"#555",lineHeight:1.7,marginBottom:26,maxWidth:500}}>Personalized story books & coloring books with your child's <strong>real photo</strong> woven into every page. Plus {collectionsData.length} magical collections starting at just ₹99!</p>
           <div style={{display:"flex",gap:14,flexWrap:"wrap"}}>
-            <Btn onClick={()=>openCollectionById("talecraft")}>✨ Create Your Own Stroy Book</Btn>
+            <Btn onClick={()=>openCollectionById("talecraft")}>✨ Create Your Own Story Book</Btn>
             <Btn bg={G} cl={D} onClick={()=>openCollectionById("personacolor")} s={{boxShadow:"0 6px 20px rgba(255,184,48,.3)",color:D}}>🎨 Create Your Own Coloring Book</Btn>
           </div>
         </div>
