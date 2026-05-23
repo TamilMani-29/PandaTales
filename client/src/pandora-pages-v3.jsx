@@ -572,11 +572,11 @@ export default function App(){
               ) : (
                 <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6,color:"#E67E22"}}>
                   <span style={{fontSize:52,lineHeight:1}}>👦</span>
-                  <span style={{fontSize:".75rem",fontWeight:700}}>Original Child Photo</span>
+                  <span style={{fontSize:".75rem",fontWeight:700}}>Your Child's Photo</span>
                 </div>
               )}
             </div>
-            <div style={{padding:10,textAlign:"center",fontFamily:"'Baloo 2',cursive",fontWeight:700,fontSize:".82rem",color:"#E67E22"}}>📷 Original Child Photo</div>
+            <div style={{padding:10,textAlign:"center",fontFamily:"'Baloo 2',cursive",fontWeight:700,fontSize:".82rem",color:"#E67E22"}}>📷 Your Child's Photo</div>
           </div>
           <div style={{position:"absolute",top:"50%",left:"50%",transform:"translate(-55%,-50%)",zIndex:10,width:65,height:65,borderRadius:"50%",background:`linear-gradient(135deg,${G},#FFD77A)`,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 8px 25px rgba(255,184,48,.4)",animation:"pulse 2s ease-in-out infinite",fontSize:24,color:"#fff",fontWeight:800}}>→</div>
           <div style={{position:"absolute",bottom:10,right:0,width:210,borderRadius:16,overflow:"hidden",boxShadow:`0 18px 50px rgba(74,31,184,.2)`,transform:"rotate(4deg)",border:`4px solid ${G}`,background:"#fff"}}>
@@ -587,7 +587,7 @@ export default function App(){
                 style={{width:162,height:194,objectFit:"cover",borderRadius:10,boxShadow:"0 8px 20px rgba(0,0,0,.2)"}}
               />
             </div>
-            <div style={{padding:10,textAlign:"center",background:`linear-gradient(135deg,${R},${L})`,fontFamily:"'Baloo 2',cursive",fontWeight:700,fontSize:".85rem",color:"#fff"}}>✨ Personalized Book Preview</div>
+            <div style={{padding:10,textAlign:"center",background:`linear-gradient(135deg,${R},${L})`,fontFamily:"'Baloo 2',cursive",fontWeight:700,fontSize:".85rem",color:"#fff"}}>✨ Their Face Inside Every Adventure</div>
           </div>
         </div>
       </div>
@@ -609,7 +609,7 @@ export default function App(){
               />
             </div>
             <div style={{padding:"14px 16px",textAlign:"center"}}>
-              <div style={{fontFamily:"'Baloo 2',cursive",fontSize:"1rem",color:"#E67E22",marginBottom:2}}>Original Child Photo</div>
+              <div style={{fontFamily:"'Baloo 2',cursive",fontSize:"1rem",color:"#E67E22",marginBottom:2}}>Your Child's Photo</div>
               <div style={{fontSize:".78rem",color:"#999"}}>Upload one clear face photo</div>
             </div>
             <div style={{padding:"8px",textAlign:"center",background:"#FFF5EB",fontFamily:"'Baloo 2',cursive",fontSize:".78rem",color:"#E67E22",fontWeight:700}}>Step 1: Upload Child Photo</div>
