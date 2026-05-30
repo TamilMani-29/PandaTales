@@ -1,15 +1,20 @@
 """Service layer for user registration and login."""
 
 import asyncio
+import hashlib
+import secrets
 import smtplib
+from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.exceptions import BadRequestException, ConflictException, UnauthorizedException
 from app.common.logging import get_logger
 from app.core.config import settings
 from app.core.security import create_access_token, get_password_hash, verify_password
+from app.models.password_reset_token import PasswordResetToken
 from app.models.user import User
 from app.repositories.user import UserRepository
 from app.schemas.auth import AuthResponse, AuthUserResponse, LoginRequest, RegisterRequest
@@ -24,6 +29,8 @@ class AuthService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.repository = UserRepository(db)
+
+    RESET_TOKEN_TTL_MINUTES = 30
 
     async def register(self, payload: RegisterRequest) -> AuthResponse:
         """Register a new user and return JWT."""
@@ -102,6 +109,100 @@ class AuthService:
         token = create_access_token(user.id)
         return AuthResponse(access_token=token, user=self._to_user_response(user))
 
+    async def request_password_reset(
+        self,
+        *,
+        email: str,
+        redirect_base_url: str | None,
+        requested_ip: str | None,
+        user_agent: str | None,
+    ) -> None:
+        """Create and email a one-time password reset token if user exists."""
+        normalized_email = email.strip().lower()
+        user = await self.repository.get_by_email(normalized_email, include_inactive=True)
+        if not user or not user.is_active or not user.password_hash:
+            return
+
+        now = datetime.now(timezone.utc)
+        await self.db.execute(
+            delete(PasswordResetToken).where(PasswordResetToken.expires_at < now)
+        )
+
+        raw_token = secrets.token_urlsafe(32)
+        token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+        expires_at = now + timedelta(minutes=self.RESET_TOKEN_TTL_MINUTES)
+
+        token_row = PasswordResetToken(
+            user_id=user.id,
+            token_hash=token_hash,
+            expires_at=expires_at,
+            requested_ip=(requested_ip or "")[:64] or None,
+            user_agent=(user_agent or "")[:255] or None,
+        )
+        self.db.add(token_row)
+        await self.db.commit()
+
+        try:
+            await self._send_password_reset_email(
+                user=user,
+                raw_token=raw_token,
+                redirect_base_url=redirect_base_url,
+            )
+        except Exception as exc:
+            logger.warning(
+                "password_reset_email_failed",
+                user_id=str(user.id),
+                email=user.email,
+                error=str(exc),
+            )
+
+    async def reset_password(self, *, token: str, new_password: str) -> None:
+        """Validate a reset token and update the user's password."""
+        token_value = token.strip()
+        if len(token_value) < 16:
+            raise BadRequestException(message="Invalid or expired reset token")
+
+        token_hash = hashlib.sha256(token_value.encode("utf-8")).hexdigest()
+        now = datetime.now(timezone.utc)
+
+        query = (
+            select(PasswordResetToken)
+            .where(
+                PasswordResetToken.token_hash == token_hash,
+                PasswordResetToken.used_at.is_(None),
+                PasswordResetToken.expires_at >= now,
+            )
+            .order_by(PasswordResetToken.created_at.desc())
+        )
+        token_row = (await self.db.execute(query)).scalars().first()
+        if not token_row:
+            raise BadRequestException(message="Invalid or expired reset token")
+
+        user = await self.repository.get_by_id(token_row.user_id, include_inactive=True)
+        if not user or not user.is_active:
+            raise BadRequestException(message="Invalid or expired reset token")
+
+        user.password_hash = get_password_hash(new_password)
+
+        # Invalidate all outstanding reset tokens for this user.
+        await self.db.execute(
+            delete(PasswordResetToken).where(PasswordResetToken.user_id == user.id)
+        )
+        await self.db.commit()
+
+    async def direct_reset_password(self, *, email: str, new_password: str) -> None:
+        """Reset password directly from in-app forgot-password flow."""
+        normalized_email = email.strip().lower()
+        user = await self.repository.get_by_email(normalized_email, include_inactive=True)
+        if not user or not user.is_active:
+            raise BadRequestException(message="No active account found for this email")
+
+        user.password_hash = get_password_hash(new_password)
+        await self.db.execute(
+            delete(PasswordResetToken).where(PasswordResetToken.user_id == user.id)
+        )
+        await self.db.commit()
+
     def build_me_response(self, user: User) -> AuthUserResponse:
         """Build profile response for current user."""
         return self._to_user_response(user)
@@ -157,6 +258,39 @@ class AuthService:
             "With love,\n"
             "PandoraPages"
         )
+        await asyncio.to_thread(self._send_email_sync, message)
+
+    async def _send_password_reset_email(
+        self,
+        *,
+        user: User,
+        raw_token: str,
+        redirect_base_url: str | None,
+    ) -> None:
+        if not settings.SMTP_HOST or not settings.SMTP_PORT:
+            return
+        if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
+            return
+
+        base_url = (redirect_base_url or "").strip().rstrip("/")
+        if not base_url:
+            base_url = "http://localhost:5173"
+        reset_link = f"{base_url}/?auth=reset&token={raw_token}"
+
+        name = user.full_name or user.first_name or "there"
+        message = EmailMessage()
+        message["Subject"] = "Reset your Panda Tales password"
+        message["From"] = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_FROM_EMAIL}>"
+        message["To"] = user.email
+        message.set_content(
+            f"Hi {name},\n\n"
+            "We received a request to reset your Panda Tales password.\n\n"
+            f"Reset link (valid for {self.RESET_TOKEN_TTL_MINUTES} minutes):\n"
+            f"{reset_link}\n\n"
+            "If you did not request this, you can safely ignore this email.\n\n"
+            "- Team Panda Tales"
+        )
+
         await asyncio.to_thread(self._send_email_sync, message)
 
     @staticmethod

@@ -98,6 +98,27 @@ export async function loginUser(input: { email: string; password: string }) {
   });
 }
 
+export async function requestPasswordReset(input: { email: string; redirect_base_url?: string }) {
+  return request<{ sent: boolean }>("/api/v1/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function resetPassword(input: { token: string; new_password: string }) {
+  return request<{ updated: boolean }>("/api/v1/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function directResetPassword(input: { email: string; new_password: string }) {
+  return request<{ updated: boolean }>("/api/v1/auth/forgot-password/direct-reset", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 export async function getCurrentUser() {
   return request<AuthUser>("/api/v1/auth/me");
 }
@@ -363,6 +384,7 @@ export async function getAdminUserPayments(userId: string) {
 export type AdminPersonalizedOrderPhoto = {
   object_name: string;
   url: string | null;
+  photo_index?: number;
 };
 
 export type AdminPersonalizedOrder = {
@@ -407,6 +429,55 @@ export async function updateAdminPersonalizedOrderStatus(
     },
     getAdminHeaders()
   );
+}
+
+export async function downloadAdminPersonalizedPhoto(
+  bookId: string,
+  photoIndex: number,
+  objectName?: string,
+  maxAttempts = 3
+): Promise<void> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const response = await fetch(
+        buildApiUrl(`/api/v1/admin/personalized-orders/${encodeURIComponent(bookId)}/photos/${encodeURIComponent(String(photoIndex))}/download`),
+        {
+          method: "GET",
+          headers: getAdminHeaders(),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to download photo (status ${response.status})`);
+      }
+
+      const disposition = response.headers.get("Content-Disposition") || "";
+      const nameMatch = disposition.match(/filename="?([^\"]+)"?/);
+      const fallbackName = objectName
+        ? String(objectName).split("/").pop() || `photo-${photoIndex + 1}`
+        : `photo-${photoIndex + 1}`;
+      const filename = nameMatch ? nameMatch[1] : fallbackName;
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.rel = "noopener";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      return;
+    } catch (error) {
+      lastError = error as Error;
+      await new Promise((resolve) => window.setTimeout(resolve, 450));
+    }
+  }
+
+  throw lastError ?? new Error("Failed to download photo");
 }
 
 export async function upsertDigitalBookCategory(input: {

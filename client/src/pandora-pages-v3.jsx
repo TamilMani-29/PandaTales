@@ -3,6 +3,7 @@ import {
   buildApiUrl,
   clearToken,
   createDigitalPaymentOrder,
+  directResetPassword,
   downloadOrderFile,
   getDigitalBookCategories,
   getDigitalBooksByCategory,
@@ -13,6 +14,7 @@ import {
   initiatePersonalizedBookOrder,
   loginUser,
   registerUser,
+  resetPassword,
   setToken,
   verifyDigitalPayment,
 } from "./lib/api";
@@ -123,7 +125,9 @@ export default function App(){
   const [authMode,setAuthMode]=useState("signin");
   const [authForm,setAuthForm]=useState({email:"",password:"",fullName:"",phone:"",referralCode:""});
   const [authErr,setAuthErr]=useState("");
+  const [authMsg,setAuthMsg]=useState("");
   const [authLoading,setAuthLoading]=useState(false);
+  const [authResetToken,setAuthResetToken]=useState("");
   const [personalizeBook,setPersonalizeBook]=useState(null);
   const [pColFilter,setPColFilter]=useState(null); // "personalized_coloring" | "personalized_story" | null
   const [heroPhotoFailed,setHeroPhotoFailed]=useState(false);
@@ -171,6 +175,19 @@ export default function App(){
       }
     }
   },[user]);
+
+  useEffect(()=>{
+    const params = new URLSearchParams(window.location.search || "");
+    const auth = (params.get("auth") || "").trim().toLowerCase();
+    const token = (params.get("token") || "").trim();
+    if(auth === "reset" && token){
+      setAuthResetToken(token);
+      setAuthMode("reset");
+      setAuthErr("");
+      setAuthMsg("Set your new password below.");
+      setAuthOpen(true);
+    }
+  },[]);
 
   useEffect(()=>{
     if(didLoadBooks.current) return;
@@ -368,7 +385,7 @@ export default function App(){
   },[col]);
 
   const submitAuth=async()=>{
-    setAuthErr("");setAuthLoading(true);
+    setAuthErr("");setAuthMsg("");setAuthLoading(true);
     try{
       if(authMode==="signup"){
         const data=await registerUser({
@@ -380,13 +397,35 @@ export default function App(){
         });
         setToken(data.access_token);
         setUser(data.user);
-      }else{
+        setAuthOpen(false);
+        setAuthForm((f)=>({email:"",password:"",fullName:"",phone:"",referralCode:f.referralCode||""}));
+      }else if(authMode==="signin"){
         const data=await loginUser({email:authForm.email,password:authForm.password});
         setToken(data.access_token);
         setUser(data.user);
+        setAuthOpen(false);
+        setAuthForm((f)=>({email:"",password:"",fullName:"",phone:"",referralCode:f.referralCode||""}));
+      }else if(authMode==="forgot"){
+        await directResetPassword({
+          email:authForm.email,
+          new_password:authForm.password,
+        });
+        setAuthMode("signin");
+        setAuthForm((f)=>({...f,password:""}));
+        setAuthMsg("Password updated. Please sign in with your new password.");
+      }else if(authMode==="reset"){
+        if(!authResetToken){
+          throw new Error("Reset token is missing. Open the reset link from your email again.");
+        }
+        await resetPassword({
+          token:authResetToken,
+          new_password:authForm.password,
+        });
+        setAuthMode("signin");
+        setAuthResetToken("");
+        setAuthForm((f)=>({...f,password:""}));
+        setAuthMsg("Password updated. Please sign in with your new password.");
       }
-      setAuthOpen(false);
-      setAuthForm((f)=>({email:"",password:"",fullName:"",phone:"",referralCode:f.referralCode||""}));
     }catch(e){setAuthErr(e.message||"Authentication failed")}
     finally{setAuthLoading(false)}
   };
@@ -436,8 +475,8 @@ export default function App(){
         <span style={{fontWeight:600,fontSize:".85rem",color:R}}>👋 {profile?.full_name||user.email?.split("@")[0]}</span>
         <button onClick={signOut} style={{background:"transparent",border:`1.5px solid ${R}`,color:R,padding:"7px 16px",borderRadius:30,fontFamily:"inherit",fontWeight:700,fontSize:".82rem",cursor:"pointer"}}>Sign Out</button>
       </>:<>
-        <button onClick={()=>{setAuthMode("signin");setAuthErr("");setAuthOpen(true)}} style={{background:"transparent",border:`1.5px solid ${R}`,color:R,padding:"7px 16px",borderRadius:30,fontFamily:"inherit",fontWeight:700,fontSize:".82rem",cursor:"pointer"}}>Sign In</button>
-        <button onClick={()=>{setAuthMode("signup");setAuthErr("");setAuthOpen(true)}} style={{background:`linear-gradient(135deg,${R},#6C5CE7)`,border:"none",color:"#fff",padding:"7px 16px",borderRadius:30,fontFamily:"inherit",fontWeight:700,fontSize:".82rem",cursor:"pointer"}}>Sign Up</button>
+        <button onClick={()=>{setAuthMode("signin");setAuthErr("");setAuthMsg("");setAuthOpen(true)}} style={{background:"transparent",border:`1.5px solid ${R}`,color:R,padding:"7px 16px",borderRadius:30,fontFamily:"inherit",fontWeight:700,fontSize:".82rem",cursor:"pointer"}}>Sign In</button>
+        <button onClick={()=>{setAuthMode("signup");setAuthErr("");setAuthMsg("");setAuthOpen(true)}} style={{background:`linear-gradient(135deg,${R},#6C5CE7)`,border:"none",color:"#fff",padding:"7px 16px",borderRadius:30,fontFamily:"inherit",fontWeight:700,fontSize:".82rem",cursor:"pointer"}}>Sign Up</button>
       </>}
     </div>
   </nav>;
@@ -449,6 +488,9 @@ export default function App(){
     const [categoryImageFailed,setCategoryImageFailed]=useState(false);
     const categoryImage = c?.category_image_url || "";
     const showCategoryImage = Boolean(categoryImage) && !categoryImageFailed;
+    const highlightX = tilt.mx ?? 50;
+    const highlightY = tilt.my ?? 50;
+    const cardHighlight = `radial-gradient(circle at ${highlightX}% ${highlightY}%, rgba(255,255,255,.35), transparent 55%)`;
     const onMove=e=>{
       const r=e.currentTarget.getBoundingClientRect();
       const px=(e.clientX-r.left)/r.width-.5;
@@ -456,28 +498,37 @@ export default function App(){
       setTilt({x:py*-12,y:px*14,active:true,mx:px*100+50,my:py*100+50});
     };
     const onLeave=()=>setTilt({x:0,y:0,active:false});
+    const topSectionHeight = "50%";
     return <div onClick={()=>go("collection",c)} onMouseMove={onMove} onMouseLeave={onLeave} style={{position:"relative",cursor:"pointer",perspective:1200,height:340}}>
       <div style={{position:"relative",width:"100%",height:"100%",borderRadius:24,transformStyle:"preserve-3d",transform:`rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) translateZ(0)`,transition:tilt.active?"transform .08s linear":"transform .5s cubic-bezier(.2,.9,.3,1.2)",background:c.grad,boxShadow:tilt.active?`0 30px 60px -15px ${c.color}55, 0 18px 40px -20px rgba(0,0,0,.3)`:`0 14px 30px -10px ${c.color}33`,overflow:"hidden"}}>
-        <div style={{position:"absolute",inset:0,background:`radial-gradient(circle at ${tilt.mx||50}% ${tilt.my||50}%, rgba(255,255,255,.35), transparent 55%)`,opacity:tilt.active?1:.5,transition:"opacity .3s",pointerEvents:"none"}}/>
-        <div style={{position:"absolute",top:-30,right:-30,width:140,height:140,borderRadius:"50%",background:"rgba(255,255,255,.15)",filter:"blur(2px)"}}/>
-        <div style={{position:"absolute",bottom:-40,left:-40,width:120,height:120,borderRadius:"50%",background:"rgba(255,255,255,.12)"}}/>
-        <div style={{position:"relative",height:"100%",padding:"26px 24px",display:"flex",flexDirection:"column",justifyContent:"space-between",color:"#fff",transform:"translateZ(40px)"}}>
+        <div style={{position:"absolute",inset:0,background:cardHighlight,opacity:tilt.active?1:.5,transition:"opacity .3s",pointerEvents:"none",zIndex:6}}></div>
+        <div style={{position:"absolute",top:-30,right:-30,width:140,height:140,borderRadius:"50%",background:"rgba(255,255,255,.15)",filter:"blur(2px)",zIndex:1}}/>
+        <div style={{position:"absolute",bottom:-40,left:-40,width:120,height:120,borderRadius:"50%",background:"rgba(255,255,255,.12)",zIndex:1}}/>
+
+        <div style={{position:"absolute",top:0,left:0,right:0,height:topSectionHeight,overflow:"hidden",zIndex:2}}>
+          {showCategoryImage ? (
+            <img
+              src={categoryImage}
+              alt={`${c.name} category`}
+              onError={()=>setCategoryImageFailed(true)}
+              style={{width:"100%",height:"100%",objectFit:"cover"}}
+            />
+          ) : null}
+          <div style={{position:"absolute",inset:0,background:showCategoryImage?"linear-gradient(180deg,rgba(0,0,0,.12),rgba(0,0,0,.45))":"linear-gradient(135deg,rgba(255,255,255,.12),rgba(0,0,0,.15))"}}/>
+        </div>
+
+        <div style={{position:"absolute",top:14,left:14,zIndex:7,width:56,height:56,borderRadius:16,background:"rgba(255,255,255,.22)",backdropFilter:"blur(10px)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:30,boxShadow:"inset 0 1px 0 rgba(255,255,255,.4), 0 8px 24px rgba(0,0,0,.18)",overflow:"hidden",transform:"translateZ(30px)"}}>
+          {c.emoji}
+        </div>
+        <div style={{position:"absolute",top:16,right:14,zIndex:7,background:"rgba(255,255,255,.96)",color:c.color,padding:"5px 12px",borderRadius:20,fontSize:".68rem",fontWeight:800,boxShadow:"0 4px 12px rgba(0,0,0,.15)",transform:"translateZ(40px)"}}>{getCollectionBadge(c)}</div>
+
+        <div style={{position:"absolute",left:0,right:0,bottom:0,height:topSectionHeight,padding:"16px 22px 18px",display:"flex",flexDirection:"column",justifyContent:"space-between",color:"#fff",zIndex:4,transform:"translateZ(40px)"}}>
           <div>
-            <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:18}}>
-              <div style={{width:64,height:64,borderRadius:18,background:"rgba(255,255,255,.22)",backdropFilter:"blur(10px)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:34,boxShadow:"inset 0 1px 0 rgba(255,255,255,.4), 0 8px 24px rgba(0,0,0,.18)",transform:"translateZ(30px)",overflow:"hidden"}}>
-                {showCategoryImage ? (
-                  <img src={categoryImage} alt={`${c.name} category`} onError={()=>setCategoryImageFailed(true)} style={{width:"100%",height:"100%",objectFit:"cover"}} />
-                ) : (
-                  c.emoji
-                )}
-              </div>
-              <div style={{background:"rgba(255,255,255,.95)",color:c.color,padding:"5px 12px",borderRadius:20,fontSize:".68rem",fontWeight:800,boxShadow:"0 4px 12px rgba(0,0,0,.15)",transform:"translateZ(40px)"}}>{getCollectionBadge(c)}</div>
-            </div>
-            <h3 style={{fontFamily:"'Baloo 2',cursive",fontSize:"1.6rem",color:"#fff",margin:"0 0 4px",textShadow:"0 2px 8px rgba(0,0,0,.15)",transform:"translateZ(20px)"}}>{c.name}</h3>
-            <p style={{fontSize:".88rem",color:"rgba(255,255,255,.92)",lineHeight:1.6,margin:0,display:"-webkit-box",WebkitLineClamp:3,WebkitBoxOrient:"vertical",overflow:"hidden",transform:"translateZ(10px)"}}>{c.desc}</p>
+            <h3 style={{fontFamily:"'Baloo 2',cursive",fontSize:"1.45rem",color:"#fff",margin:"0 0 6px",textShadow:"0 2px 8px rgba(0,0,0,.15)",transform:"translateZ(20px)",lineHeight:1.1}}>{c.name}</h3>
+            <p style={{fontSize:".84rem",color:"rgba(255,255,255,.92)",lineHeight:1.45,margin:0,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden",transform:"translateZ(10px)"}}>{c.desc}</p>
           </div>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",paddingTop:16,borderTop:"1px solid rgba(255,255,255,.25)",transform:"translateZ(25px)"}}>
-            <div><div style={{fontSize:".64rem",color:"rgba(255,255,255,.65)",fontWeight:700,letterSpacing:1}}>STARTING</div><div style={{fontFamily:"'Baloo 2',cursive",fontSize:"1.4rem",color:"#fff",fontWeight:800,lineHeight:1}}>₹99</div></div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",paddingTop:12,borderTop:"1px solid rgba(255,255,255,.25)",transform:"translateZ(25px)"}}>
+            <div><div style={{fontSize:".64rem",color:"rgba(255,255,255,.65)",fontWeight:700,letterSpacing:1}}>STARTING</div><div style={{fontFamily:"'Baloo 2',cursive",fontSize:"1.35rem",color:"#fff",fontWeight:800,lineHeight:1}}>₹99</div></div>
             <div style={{background:"rgba(255,255,255,.95)",color:c.color,padding:"10px 18px",borderRadius:30,fontWeight:800,fontSize:".85rem",boxShadow:"0 6px 18px rgba(0,0,0,.18)",display:"flex",alignItems:"center",gap:6}}>Explore <span style={{transition:"transform .3s",display:"inline-block",transform:tilt.active?"translateX(3px)":"translateX(0)"}}>→</span></div>
           </div>
         </div>
@@ -548,7 +599,11 @@ export default function App(){
       <div style={{maxWidth:1320,width:"100%",display:"grid",gridTemplateColumns:"1fr 1fr",gap:50,alignItems:"center",position:"relative",zIndex:2}}>
         <div>
           <div style={{display:"flex",gap:10,marginBottom:22,flexWrap:"wrap"}}>
-            {[["📱 Digital Books @ ₹99","#E8F5E9","#27AE60"],["🎨 Coloring Books @ ₹199","#FFF3E0","#E67E22"],["📖 Story Books @ ₹399","#EDE7FF",R]].map(([t,bg,c])=><span key={t} style={{padding:"5px 14px",borderRadius:30,fontSize:".8rem",fontWeight:600,background:bg,color:c}}>{t}</span>)}
+            {["📱 Digital Books @ ₹99","🎨 Personalized Coloring Books @ ₹399","📖 Personalized Story Books @ ₹599"].map((t,i)=>{
+              const colors = [["#E8F5E9","#27AE60"],["#FFF3E0","#E67E22"],["#EDE7FF",R]];
+              const [bg,c] = colors[i];
+              return <span key={t} style={{padding:"5px 14px",borderRadius:30,fontSize:".8rem",fontWeight:600,background:bg,color:c}}>{t}</span>;
+            })}
           </div>
           <h1 style={{fontFamily:"'Baloo 2',cursive",fontSize:"clamp(2rem,4.5vw,3.3rem)",lineHeight:1.15,color:D,marginBottom:16}}>
             Your Child Becomes the <span style={{background:`linear-gradient(135deg,${R},${L})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>Hero</span> of Their Own <span style={{color:G,WebkitTextFillColor:G}}>Story</span>
@@ -659,6 +714,37 @@ export default function App(){
       </div>
     </section>
 
+    <section style={{padding:"70px 20px",background:"#fff"}}>
+      <div style={{textAlign:"center",marginBottom:30}}>
+        <span style={{display:"inline-block",padding:"5px 16px",borderRadius:20,fontSize:".75rem",fontWeight:700,background:"#EFE9FF",color:R,letterSpacing:.7}}>📚 ALL PRODUCT FORMATS</span>
+        <h2 style={{fontFamily:"'Baloo 2',cursive",fontSize:"clamp(1.8rem,3.6vw,2.5rem)",color:D,margin:"10px 0 6px"}}>Choose What's Right for Your Child</h2>
+        <p style={{color:"#666",fontSize:".98rem",maxWidth:620,margin:"0 auto"}}>Quick overview of all products right here on the home page.</p>
+      </div>
+      <div style={{maxWidth:1320,margin:"0 auto"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))",gap:24}}>
+          {[
+            {emoji:"📱",title:"Digital Books",badge:"📚 Ready-Made Catalog",badgeBg:"linear-gradient(135deg,#27AE60,#2ECC71)",desc:`${nonPersonalizedCollections.length} magical collections — stories, STEM, art, life skills & more. Instant digital delivery to your inbox or WhatsApp!`,price:"₹99",pl:"per book onwards",cta:"Browse Collections",action:()=>go("collections"),hdr:"linear-gradient(135deg,#E8F5E9,#C8E6C9)",feats:["Instant delivery","40+ titles","Ages 2–15"]},
+            {emoji:"🎨",title:"Coloring Books",badge:"📷 Personalized",badgeBg:`linear-gradient(135deg,${R},${L})`,desc:"10 personalized coloring pages featuring your child's real photo as line art. Printed & shipped to your doorstep!",price:"₹399",pl:"per book onwards",cta:"Create Coloring Book",action:()=>openCollectionById("personacolor"),hdr:"linear-gradient(135deg,#FFF3E0,#FFECB3)",feats:["Real photo as line art","10 themed pages","Free preview first"]},
+            {emoji:"📖",title:"Story Books",badge:"📷 Personalized + Real Photo",badgeBg:`linear-gradient(135deg,${R},${L})`,desc:"Your child's real photo inside a fully illustrated storybook — they become the hero of an unforgettable adventure!",price:"₹599",pl:"per book onwards",cta:"Create Story Book",action:()=>openCollectionById("talecraft"),hdr:"linear-gradient(135deg,#EDE7FF,#F3E8FF)",feats:["Hardcover printed","Real face on every page","24–32 illustrated pages"]},
+          ].map((p,i)=><div key={i} onClick={p.action} style={{background:"#fff",borderRadius:22,overflow:"hidden",boxShadow:"0 4px 20px rgba(0,0,0,.06)",transition:"all .4s",position:"relative",cursor:"pointer"}}
+            onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-10px)";e.currentTarget.style.boxShadow="0 24px 60px rgba(0,0,0,.12)"}}
+            onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="0 4px 20px rgba(0,0,0,.06)"}}>
+            <div style={{padding:"40px 24px 28px",textAlign:"center",background:p.hdr,position:"relative"}}>
+              <div style={{fontSize:"3.5rem",marginBottom:10}}>{p.emoji}</div>
+              <div style={{display:"inline-flex",padding:"3px 12px",borderRadius:20,fontSize:".72rem",fontWeight:700,background:p.badgeBg,color:"#fff",marginBottom:10}}>{p.badge}</div>
+              <h3 style={{fontFamily:"'Baloo 2',cursive",fontSize:"1.45rem"}}>{p.title}</h3>
+            </div>
+            <div style={{padding:"22px 26px 28px"}}>
+              <p style={{fontSize:".92rem",color:"#666",lineHeight:1.7,marginBottom:14}}>{p.desc}</p>
+              <ul style={{listStyle:"none",padding:0,margin:"0 0 18px"}}>{p.feats.map(f=><li key={f} style={{fontSize:".85rem",color:"#555",padding:"5px 0",display:"flex",alignItems:"center",gap:8}}><span style={{color:"#27AE60",fontWeight:800}}>✓</span>{f}</li>)}</ul>
+              <div style={{display:"flex",alignItems:"baseline",gap:6,marginBottom:16}}><span style={{fontFamily:"'Baloo 2',cursive",fontSize:"2rem",fontWeight:800,color:R}}>{p.price}</span><span style={{fontSize:".82rem",color:"#999"}}>{p.pl}</span></div>
+              <Btn s={{width:"100%",justifyContent:"center",fontSize:".95rem",padding:"12px"}}>{p.cta} →</Btn>
+            </div>
+          </div>)}
+        </div>
+      </div>
+    </section>
+
     <section style={{padding:"70px 20px",background:"linear-gradient(135deg,#E8F5E9,#C8E6C9,#A5D6A7)",textAlign:"center"}}>
       <h2 style={{fontFamily:"'Baloo 2',cursive",fontSize:"clamp(1.6rem,3vw,2.2rem)",color:"#1B5E20",marginBottom:10,display:"inline-flex",alignItems:"center",gap:10}}><WhatsAppIcon size={26} color={W} /> Join Our WhatsApp Community</h2>
       <p style={{color:"#2E7D32",fontSize:"1rem",marginBottom:28}}>Weekly FREE coloring pages, story prompts & exclusive deals!</p>
@@ -680,10 +766,10 @@ export default function App(){
       <p style={{fontSize:".84rem",lineHeight:1.8,maxWidth:640,margin:"12px auto 0",color:"rgba(255,255,255,.65)"}}>Personalized coloring books &amp; enchanting storybooks crafted with real photos — turning precious memories into unforgettable adventures.</p>
       <p style={{fontSize:".84rem",lineHeight:1.8,maxWidth:640,margin:"10px auto 0",color:"rgba(255,255,255,.65)"}}>Explore our growing collection of printed &amp; digital creations designed to spark imagination, creativity, and joyful reading moments for every little dreamer. 💫</p>
       <div style={{display:"flex",justifyContent:"center",gap:14,flexWrap:"wrap",marginTop:24,marginBottom:8}}>
-        <a href="https://www.instagram.com/pandorapages.in" target="_blank" rel="noreferrer" style={{display:"inline-flex",alignItems:"center",gap:8,padding:"10px 20px",borderRadius:40,background:"linear-gradient(135deg,#E1306C,#833AB4,#F77737)",color:"#fff",fontWeight:700,fontSize:".85rem",textDecoration:"none",boxShadow:"0 4px 16px rgba(225,48,108,.35)"}}>
+        <a href="https://www.instagram.com/pandorapages.in/" target="_blank" rel="noreferrer" style={{display:"inline-flex",alignItems:"center",gap:8,padding:"10px 20px",borderRadius:40,background:"linear-gradient(135deg,#E1306C,#833AB4,#F77737)",color:"#fff",fontWeight:700,fontSize:".85rem",textDecoration:"none",boxShadow:"0 4px 16px rgba(225,48,108,.35)"}}>
           📸 Follow on Instagram
         </a>
-        <a href="https://wa.me/message/pandorapages" target="_blank" rel="noreferrer" style={{display:"inline-flex",alignItems:"center",gap:8,padding:"10px 20px",borderRadius:40,background:"linear-gradient(135deg,#25D366,#128C7E)",color:"#fff",fontWeight:700,fontSize:".85rem",textDecoration:"none",boxShadow:"0 4px 16px rgba(37,211,102,.35)"}}>
+        <a href="https://chat.whatsapp.com/CMevldqAxQEAP0z40jTF5j" target="_blank" rel="noreferrer" style={{display:"inline-flex",alignItems:"center",gap:8,padding:"10px 20px",borderRadius:40,background:"linear-gradient(135deg,#25D366,#128C7E)",color:"#fff",fontWeight:700,fontSize:".85rem",textDecoration:"none",boxShadow:"0 4px 16px rgba(37,211,102,.35)"}}>
           💬 Join WhatsApp Community
         </a>
       </div>
@@ -1318,22 +1404,53 @@ export default function App(){
 
   const AuthM=()=>{
     if(!authOpen) return null;
+    const isSignup=authMode==="signup";
+    const isSignin=authMode==="signin";
+    const isForgot=authMode==="forgot";
+    const isReset=authMode==="reset";
+    const authTitle=isSignup?"Join Pandora Pages":isForgot?"Forgot Password":isReset?"Reset Password":"Welcome Back";
+    const authSubtitle=isSignup
+      ?"Create your account to get started"
+      :isForgot
+      ?"Enter your email and set a new password"
+      :isReset
+      ?"Set a new password for your account"
+      :"Sign in to track your orders";
+    const authSubmitDisabled=authLoading
+      || (isSignup && (!authForm.fullName || !authForm.phone || !authForm.email || !authForm.password))
+      || (isSignin && (!authForm.email || !authForm.password))
+      || (isForgot && (!authForm.email || !authForm.password))
+      || (isReset && !authForm.password);
+    const authSubmitLabel=authLoading
+      ?"..."
+      :isSignup
+      ?"✨ Create Account"
+      :isForgot
+      ?"🔒 Reset Password"
+      :isReset
+      ?"🔒 Update Password"
+      :"🔑 Sign In";
+
     return <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",backdropFilter:"blur(8px)",zIndex:1003,display:"flex",alignItems:"center",justifyContent:"center",padding:16,animation:"fadeIn .3s"}}>
       <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:24,maxWidth:420,width:"100%",overflow:"hidden",animation:"slideUp .4s cubic-bezier(.4,0,.2,1)"}}>
         <div style={{background:`linear-gradient(135deg,${R},#6C5CE7,${L})`,padding:"28px 24px 32px",position:"relative",textAlign:"center"}}>
           <button onClick={()=>setAuthOpen(false)} style={{position:"absolute",top:10,right:10,width:28,height:28,borderRadius:"50%",border:"none",background:"rgba(255,255,255,.15)",color:"#fff",cursor:"pointer",fontSize:13}}>✕</button>
           <div style={{fontSize:36,marginBottom:6}}>📖</div>
-          <h2 style={{fontFamily:"'Baloo 2',cursive",fontSize:"1.3rem",color:"#fff",margin:0}}>{authMode==="signup"?"Join Pandora Pages":"Welcome Back"}</h2>
-          <p style={{fontSize:".82rem",color:"rgba(255,255,255,.75)",marginTop:4}}>{authMode==="signup"?"Create your account to get started":"Sign in to track your orders"}</p>
+          <h2 style={{fontFamily:"'Baloo 2',cursive",fontSize:"1.3rem",color:"#fff",margin:0}}>{authTitle}</h2>
+          <p style={{fontSize:".82rem",color:"rgba(255,255,255,.75)",marginTop:4}}>{authSubtitle}</p>
         </div>
         <div style={{padding:24}}>
-          {authMode==="signup"&&<div style={{marginBottom:12}}><label style={{fontSize:".72rem",fontWeight:700,color:"#999",textTransform:"uppercase",letterSpacing:.5,display:"block",marginBottom:4}}>Full Name</label><input value={authForm.fullName} onChange={e=>setAuthForm(f=>({...f,fullName:e.target.value}))} placeholder="Jane Doe" style={{width:"100%",padding:"11px 14px",borderRadius:12,border:"2px solid #E8E0F0",fontSize:14,fontFamily:"inherit",outline:"none"}}/></div>}
-          {authMode==="signup"&&<div style={{marginBottom:12}}><label style={{fontSize:".72rem",fontWeight:700,color:"#999",textTransform:"uppercase",letterSpacing:.5,display:"block",marginBottom:4}}>Phone Number</label><input type="tel" value={authForm.phone} onChange={e=>setAuthForm(f=>({...f,phone:e.target.value}))} placeholder="10-digit mobile number" style={{width:"100%",padding:"11px 14px",borderRadius:12,border:"2px solid #E8E0F0",fontSize:14,fontFamily:"inherit",outline:"none"}}/></div>}
-          <div style={{marginBottom:12}}><label style={{fontSize:".72rem",fontWeight:700,color:"#999",textTransform:"uppercase",letterSpacing:.5,display:"block",marginBottom:4}}>Email</label><input type="email" value={authForm.email} onChange={e=>setAuthForm(f=>({...f,email:e.target.value}))} placeholder="you@email.com" style={{width:"100%",padding:"11px 14px",borderRadius:12,border:"2px solid #E8E0F0",fontSize:14,fontFamily:"inherit",outline:"none"}}/></div>
-          <div style={{marginBottom:14}}><label style={{fontSize:".72rem",fontWeight:700,color:"#999",textTransform:"uppercase",letterSpacing:.5,display:"block",marginBottom:4}}>Password</label><input type="password" value={authForm.password} onChange={e=>setAuthForm(f=>({...f,password:e.target.value}))} placeholder="At least 8 characters" style={{width:"100%",padding:"11px 14px",borderRadius:12,border:"2px solid #E8E0F0",fontSize:14,fontFamily:"inherit",outline:"none"}}/></div>
+          {isSignup&&<div style={{marginBottom:12}}><label style={{fontSize:".72rem",fontWeight:700,color:"#999",textTransform:"uppercase",letterSpacing:.5,display:"block",marginBottom:4}}>Full Name</label><input value={authForm.fullName} onChange={e=>setAuthForm(f=>({...f,fullName:e.target.value}))} placeholder="Jane Doe" style={{width:"100%",padding:"11px 14px",borderRadius:12,border:"2px solid #E8E0F0",fontSize:14,fontFamily:"inherit",outline:"none"}}/></div>}
+          {isSignup&&<div style={{marginBottom:12}}><label style={{fontSize:".72rem",fontWeight:700,color:"#999",textTransform:"uppercase",letterSpacing:.5,display:"block",marginBottom:4}}>Phone Number</label><input type="tel" value={authForm.phone} onChange={e=>setAuthForm(f=>({...f,phone:e.target.value}))} placeholder="10-digit mobile number" style={{width:"100%",padding:"11px 14px",borderRadius:12,border:"2px solid #E8E0F0",fontSize:14,fontFamily:"inherit",outline:"none"}}/></div>}
+          {(isSignup||isSignin||isForgot)&&<div style={{marginBottom:12}}><label style={{fontSize:".72rem",fontWeight:700,color:"#999",textTransform:"uppercase",letterSpacing:.5,display:"block",marginBottom:4}}>Email</label><input type="email" value={authForm.email} onChange={e=>setAuthForm(f=>({...f,email:e.target.value}))} placeholder="you@email.com" style={{width:"100%",padding:"11px 14px",borderRadius:12,border:"2px solid #E8E0F0",fontSize:14,fontFamily:"inherit",outline:"none"}}/></div>}
+          {(isSignup||isSignin||isForgot||isReset)&&<div style={{marginBottom:14}}><label style={{fontSize:".72rem",fontWeight:700,color:"#999",textTransform:"uppercase",letterSpacing:.5,display:"block",marginBottom:4}}>{isReset||isForgot?"New Password":"Password"}</label><input type="password" value={authForm.password} onChange={e=>setAuthForm(f=>({...f,password:e.target.value}))} placeholder="At least 8 characters" style={{width:"100%",padding:"11px 14px",borderRadius:12,border:"2px solid #E8E0F0",fontSize:14,fontFamily:"inherit",outline:"none"}}/></div>}
+
+          {isSignin&&<p style={{textAlign:"right",fontSize:".82rem",margin:"-4px 0 12px"}}><span onClick={()=>{setAuthMode("forgot");setAuthErr("");setAuthMsg("")}} style={{color:R,fontWeight:700,cursor:"pointer"}}>Forgot password?</span></p>}
           {authErr&&<div style={{background:"#FEE",color:"#C0392B",padding:"10px 14px",borderRadius:10,fontSize:".82rem",marginBottom:12}}>{authErr}</div>}
-          <button onClick={submitAuth} disabled={authLoading||!authForm.email||!authForm.password||(authMode==="signup"&&(!authForm.fullName||!authForm.phone))} style={{width:"100%",background:authLoading||!authForm.email||!authForm.password||(authMode==="signup"&&(!authForm.fullName||!authForm.phone))?"#DDD":`linear-gradient(135deg,${R},#6C5CE7)`,color:authLoading||!authForm.email||!authForm.password||(authMode==="signup"&&(!authForm.fullName||!authForm.phone))?"#999":"#fff",border:"none",padding:14,borderRadius:14,fontFamily:"'Baloo 2',cursive",fontSize:"1.02rem",fontWeight:700,cursor:authLoading?"wait":"pointer",marginBottom:12}}>{authLoading?"...":authMode==="signup"?"✨ Create Account":"🔑 Sign In"}</button>
-          <p style={{textAlign:"center",fontSize:".88rem",color:"#666"}}>{authMode==="signup"?"Already have an account? ":"New here? "}<span onClick={()=>{setAuthMode(authMode==="signup"?"signin":"signup");setAuthErr("")}} style={{color:R,fontWeight:700,cursor:"pointer"}}>{authMode==="signup"?"Sign In":"Create Account"}</span></p>
+          {authMsg&&<div style={{background:"#ECFDF5",color:"#065F46",padding:"10px 14px",borderRadius:10,fontSize:".82rem",marginBottom:12}}>{authMsg}</div>}
+          <button onClick={submitAuth} disabled={authSubmitDisabled} style={{width:"100%",background:authSubmitDisabled?"#DDD":`linear-gradient(135deg,${R},#6C5CE7)`,color:authSubmitDisabled?"#999":"#fff",border:"none",padding:14,borderRadius:14,fontFamily:"'Baloo 2',cursive",fontSize:"1.02rem",fontWeight:700,cursor:authLoading?"wait":"pointer",marginBottom:12}}>{authSubmitLabel}</button>
+          {(isSignup||isSignin)&&<p style={{textAlign:"center",fontSize:".88rem",color:"#666"}}>{isSignup?"Already have an account? ":"New here? "}<span onClick={()=>{setAuthMode(isSignup?"signin":"signup");setAuthErr("");setAuthMsg("")}} style={{color:R,fontWeight:700,cursor:"pointer"}}>{isSignup?"Sign In":"Create Account"}</span></p>}
+          {(isForgot||isReset)&&<p style={{textAlign:"center",fontSize:".88rem",color:"#666"}}><span onClick={()=>{setAuthMode("signin");setAuthErr("");setAuthMsg("")}} style={{color:R,fontWeight:700,cursor:"pointer"}}>← Back to Sign In</span></p>}
         </div>
       </div>
     </div>;

@@ -3,6 +3,7 @@ import {
   adminLogin,
   createDigitalBookAttributeOption,
   createDigitalBookAdmin,
+  downloadAdminPersonalizedPhoto,
   deleteDigitalBookAttributeOption,
   getAdminPersonalizedOrders,
   getAdminUserPayments,
@@ -248,6 +249,15 @@ export default function AdminPage() {
   const [personalizedLoading, setPersonalizedLoading] = useState(false);
   const [personalizedError, setPersonalizedError] = useState("");
   const [personalizedSavingId, setPersonalizedSavingId] = useState("");
+
+  async function handleDownloadPersonalizedPhoto(bookId, photoIndex, objectName) {
+    try {
+      await downloadAdminPersonalizedPhoto(bookId, photoIndex, objectName);
+      setActionMsg("✅ Photo download started");
+    } catch (err) {
+      setActionMsg("❌ " + (err?.message || "Failed to download photo"));
+    }
+  }
 
   useEffect(() => {
     return () => {
@@ -1021,33 +1031,35 @@ export default function AdminPage() {
                     <div style={{ fontSize: 11, color: "#6b5d92", fontWeight: 800, textTransform: "uppercase", marginBottom: 6 }}>Uploaded Photos</div>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       {Array.isArray(o.photos) && o.photos.length ? o.photos.map((photo, idx) => (
-                        <a
-                          key={`${o.order_id}-${photo.object_name}-${idx}`}
-                          href={photo.url || "#"}
-                          target="_blank"
-                          rel="noreferrer"
+                        <div
+                          key={`${o.book_id}-${photo.object_name}-${idx}`}
                           style={{
                             border: "1px solid rgba(74,31,184,.2)",
                             borderRadius: 10,
                             padding: 6,
-                            textDecoration: "none",
                             color: D,
                             background: "#fff",
                             width: 96,
                             display: "grid",
                             gap: 4,
                           }}
-                          onClick={(e) => {
-                            if (!photo.url) e.preventDefault();
-                          }}
                         >
                           {photo.url ? (
-                            <img src={photo.url} alt={`uploaded-${idx + 1}`} style={{ width: "100%", height: 64, objectFit: "cover", borderRadius: 8, background: "#f3f4f6" }} />
+                            <a href={photo.url} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
+                              <img src={photo.url} alt={`uploaded-${idx + 1}`} style={{ width: "100%", height: 64, objectFit: "cover", borderRadius: 8, background: "#f3f4f6" }} />
+                            </a>
                           ) : (
                             <div style={{ width: "100%", height: 64, borderRadius: 8, background: "#f3f4f6", display: "grid", placeItems: "center", fontSize: 11, color: "#6b7280" }}>Unavailable</div>
                           )}
                           <span style={{ fontSize: 11, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Photo {idx + 1}</span>
-                        </a>
+                          <button
+                            type="button"
+                            style={{ ...button, padding: "5px 8px", borderRadius: 8, fontSize: 11, background: "#E0ECFF", color: "#1d4ed8" }}
+                            onClick={() => handleDownloadPersonalizedPhoto(o.book_id, photo.photo_index ?? idx, photo.object_name)}
+                          >
+                            ⬇ Download
+                          </button>
+                        </div>
                       )) : <span style={{ fontSize: 13, color: "#6b7280" }}>No uploaded photos</span>}
                     </div>
                   </div>

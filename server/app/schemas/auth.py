@@ -35,6 +35,27 @@ class LoginRequest(BaseModel):
         return value
 
 
+class ForgotPasswordRequest(BaseModel):
+    """Forgot-password request payload."""
+
+    email: EmailStr
+    redirect_base_url: str | None = Field(None, max_length=500)
+
+
+class ResetPasswordRequest(BaseModel):
+    """Reset-password submission payload."""
+
+    token: str = Field(..., min_length=16, max_length=512)
+    new_password: str = Field(..., min_length=8, max_length=100)
+
+
+class DirectResetPasswordRequest(BaseModel):
+    """Direct reset payload used by in-app forgot-password flow."""
+
+    email: EmailStr
+    new_password: str = Field(..., min_length=8, max_length=100)
+
+
 class AuthUserResponse(BaseModel):
     """User shape returned after auth/me calls."""
 

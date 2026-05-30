@@ -1,9 +1,11 @@
 """Admin API routes with fixed credentials for internal panel access."""
 
+import mimetypes
+from pathlib import Path
 from datetime import timedelta
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, status
+from fastapi import APIRouter, Depends, Header, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -164,22 +166,34 @@ async def admin_list_personalized_orders(
     rows = (await db.execute(query)).scalars().all()
 
     storage = StorageService()
+
+    def _resolve_photo_url(object_name: str) -> str | None:
+        obj = str(object_name or "").strip()
+        if not obj:
+            return None
+        if obj.startswith("http://") or obj.startswith("https://"):
+            return obj
+        public_url = storage.get_public_file_url(obj)
+        return public_url
+
     items: list[dict] = []
     for book in rows:
         photos: list[dict] = []
-        for object_name in (book.photos or []):
-            photo_url: str | None = None
-            try:
-                photo_url = await storage.get_file_url(
-                    object_name,
-                    expires=timedelta(hours=1),
-                    check_exists=False,
-                )
-            except Exception:
-                photo_url = None
+        for idx, object_name in enumerate(book.photos or []):
+            photo_url: str | None = _resolve_photo_url(object_name)
+            if not photo_url:
+                try:
+                    photo_url = await storage.get_file_url(
+                        object_name,
+                        expires=timedelta(hours=1),
+                        check_exists=False,
+                    )
+                except Exception:
+                    photo_url = None
             photos.append({
                 "object_name": object_name,
                 "url": photo_url,
+                "photo_index": idx,
             })
 
         items.append(
@@ -204,6 +218,62 @@ async def admin_list_personalized_orders(
         )
 
     return success_response(data=items, message="Personalized orders retrieved successfully")
+
+
+@router.get(
+    "/personalized-orders/{book_id}/photos/{photo_index}/download",
+    status_code=status.HTTP_200_OK,
+    summary="Download personalized uploaded photo",
+    description="Download a specific uploaded photo file for a personalized order.",
+)
+async def admin_download_personalized_photo(
+    book_id: str,
+    photo_index: int,
+    _: None = Depends(require_admin_headers),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    try:
+        target_book_id = UUID(book_id)
+    except ValueError as exc:
+        raise BadRequestException("Invalid book ID format") from exc
+
+    if photo_index < 0:
+        raise BadRequestException("Invalid photo index")
+
+    book = await db.get(GeneratedBook, target_book_id)
+    if not book:
+        raise BadRequestException("Personalized order not found")
+
+    photos = list(book.photos or [])
+    if photo_index >= len(photos):
+        raise BadRequestException("Photo not found")
+
+    object_name = str(photos[photo_index] or "").strip()
+    if not object_name:
+        raise BadRequestException("Photo not found")
+
+    storage = StorageService()
+    if object_name.startswith("http://") or object_name.startswith("https://"):
+        # Some legacy rows store direct URLs instead of object keys.
+        import httpx
+
+        async with httpx.AsyncClient(timeout=60) as client:
+            upstream = await client.get(object_name)
+            if upstream.status_code >= 400:
+                raise BadRequestException("Unable to download photo")
+            raw_data = upstream.content
+            content_type = upstream.headers.get("content-type") or "application/octet-stream"
+            name_guess = Path(object_name.split("?")[0]).name or f"photo_{photo_index + 1}"
+    else:
+        raw_data = await storage.download_file(object_name)
+        content_type = mimetypes.guess_type(object_name)[0] or "application/octet-stream"
+        name_guess = Path(object_name).name or f"photo_{photo_index + 1}"
+
+    return Response(
+        content=raw_data,
+        media_type=content_type,
+        headers={"Content-Disposition": f'attachment; filename="{name_guess}"'},
+    )
 
 
 @router.patch(

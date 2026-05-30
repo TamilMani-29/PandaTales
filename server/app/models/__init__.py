@@ -11,6 +11,7 @@ from app.models.generated_book import GeneratedBook
 from app.models.generation_config import GenerationConfig
 from app.models.genre import Genre
 from app.models.order import Order
+from app.models.password_reset_token import PasswordResetToken
 from app.models.story_book_template import StoryBookTemplate
 from app.models.user import User
 
@@ -26,6 +27,7 @@ __all__ = [
     "GenerationConfig",
     "Genre",
     "Order",
+    "PasswordResetToken",
     "StoryBookTemplate",
     "User",
 ]
