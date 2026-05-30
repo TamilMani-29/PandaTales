@@ -3,6 +3,7 @@ import {
   buildApiUrl,
   clearToken,
   createDigitalPaymentOrder,
+  downloadOrderFile,
   getDigitalBookCategories,
   getDigitalBooksByCategory,
   getCurrentUser,
@@ -552,7 +553,7 @@ export default function App(){
           <h1 style={{fontFamily:"'Baloo 2',cursive",fontSize:"clamp(2rem,4.5vw,3.3rem)",lineHeight:1.15,color:D,marginBottom:16}}>
             Your Child Becomes the <span style={{background:`linear-gradient(135deg,${R},${L})`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent"}}>Hero</span> of Their Own <span style={{color:G,WebkitTextFillColor:G}}>Story</span>
           </h1>
-          <p style={{fontSize:"1.08rem",color:"#555",lineHeight:1.7,marginBottom:26,maxWidth:500}}>Personalized story books & coloring books with your child's <strong>real photo</strong> woven into every page. Plus {collectionsData.length} magical collections starting at just ₹99!</p>
+          <p style={{fontSize:"1.08rem",color:"#555",lineHeight:1.7,marginBottom:26,maxWidth:500}}>Personalized story books & coloring books with your child's <strong>real photo</strong> woven into every page. Plus {nonPersonalizedCollections.length} magical collections starting at just ₹99!</p>
           <div style={{display:"flex",gap:14,flexWrap:"wrap"}}>
             <Btn onClick={()=>openCollectionById("talecraft")}>✨ Create Your Own Story Book</Btn>
             <Btn bg={G} cl={D} onClick={()=>openCollectionById("personacolor")} s={{boxShadow:"0 6px 20px rgba(255,184,48,.3)",color:D}}>🎨 Create Your Own Coloring Book</Btn>
@@ -643,7 +644,7 @@ export default function App(){
 
     <section style={{padding:"80px 20px",background:"linear-gradient(180deg,#fff,#FFF5EB)"}}>
       <div style={{textAlign:"center",marginBottom:50}}>
-        <h2 style={{fontFamily:"'Baloo 2',cursive",fontSize:"clamp(2rem,4vw,2.8rem)",color:D,marginBottom:8}}><span style={{color:G}}>{collectionsData.length}</span> Magical Collections</h2>
+        <h2 style={{fontFamily:"'Baloo 2',cursive",fontSize:"clamp(2rem,4vw,2.8rem)",color:D,marginBottom:8}}><span style={{color:G}}>{nonPersonalizedCollections.length}</span> Magical Collections</h2>
         <p style={{color:"#888",fontSize:"1.02rem"}}>Every child. Every interest. Every dream.</p>
       </div>
       {nonPersonalizedCollections.length>0 ? (
@@ -724,7 +725,7 @@ export default function App(){
 
   const Products=()=>{
     const items=[
-      {emoji:"📱",title:"Digital Books",badge:"📚 Ready-Made Catalog",badgeBg:"linear-gradient(135deg,#27AE60,#2ECC71)",desc:"10 magical collections — stories, STEM, art, life skills & more. Instant digital delivery to your inbox or WhatsApp!",price:"₹99",pl:"per book onwards",cta:"Browse Collections",action:()=>go("collections"),hdr:"linear-gradient(135deg,#E8F5E9,#C8E6C9)",feats:["Instant delivery","40+ titles","Ages 2–15"]},
+      {emoji:"📱",title:"Digital Books",badge:"📚 Ready-Made Catalog",badgeBg:"linear-gradient(135deg,#27AE60,#2ECC71)",desc:`${nonPersonalizedCollections.length} magical collections — stories, STEM, art, life skills & more. Instant digital delivery to your inbox or WhatsApp!`,price:"₹99",pl:"per book onwards",cta:"Browse Collections",action:()=>go("collections"),hdr:"linear-gradient(135deg,#E8F5E9,#C8E6C9)",feats:["Instant delivery","40+ titles","Ages 2–15"]},
       {emoji:"🎨",title:"Coloring Books",badge:"📷 Personalized",badgeBg:`linear-gradient(135deg,${R},${L})`,desc:"10 personalized coloring pages featuring your child's real photo as line art. Printed & shipped to your doorstep!",price:"₹199",pl:"printed & shipped",cta:"Create Coloring Book",action:()=>openCollectionById("personacolor"),hdr:"linear-gradient(135deg,#FFF3E0,#FFECB3)",feats:["Real photo as line art","10 themed pages","Free preview first"]},
       {emoji:"📖",title:"Story Books",badge:"📷 Personalized + Real Photo",badgeBg:`linear-gradient(135deg,${R},${L})`,desc:"Your child's real photo inside a fully illustrated storybook — they become the hero of an unforgettable adventure!",price:"₹399",pl:"printed & shipped",cta:"Create Story Book",action:()=>openCollectionById("talecraft"),hdr:"linear-gradient(135deg,#EDE7FF,#F3E8FF)",feats:["Hardcover printed","Real face on every page","24–32 illustrated pages"]},
     ];
@@ -1193,18 +1194,11 @@ export default function App(){
                     });
                     const orderId = result.order_id;
                     try {
-                      const urls=result.download_urls||{};
-                      if(!urls.book){
-                        throw new Error("Download link is unavailable.");
-                      }
-                      if(urls.book){
-                        autoDownloadFromUrl(urls.book,0);
-                      }
-                      if(urls.cover){
-                        autoDownloadFromUrl(urls.cover,700);
-                      }
+                      await downloadOrderFile(orderId, "book");
+                      await new Promise((resolve)=>window.setTimeout(resolve,700));
+                      await downloadOrderFile(orderId, "cover");
                     } catch (_) {
-                      setCheckoutError("Payment successful, but automatic download link is unavailable or blocked by the browser.");
+                      setCheckoutError("Payment successful, but automatic download failed. Please retry from payment history.");
                     }
                     setDone(true);
                   },
@@ -1214,6 +1208,11 @@ export default function App(){
                     },
                   },
                   theme: { color: "#4A1FB8" },
+                });
+
+                rz.on("payment.failed", (event) => {
+                  const message = event?.error?.description || event?.error?.reason || "Payment failed at gateway.";
+                  setCheckoutError(message);
                 });
 
                 rz.open();
