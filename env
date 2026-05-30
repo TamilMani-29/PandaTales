@@ -49,6 +49,7 @@ STRIPE_WEBHOOK_SECRET=
 # Razorpay Payment
 RAZORPAY_KEY_ID=rzp_live_SiUI8WUPKBlsf9
 RAZORPAY_KEY_SECRET=tnjNsJUjVpjzZ4aOWLUv3luL
+RAZORPAY_WEBHOOK_SECRET=pandorapages@123
 
 # Razorpay (local SSL workaround)
 RAZORPAY_VERIFY_SSL=false
