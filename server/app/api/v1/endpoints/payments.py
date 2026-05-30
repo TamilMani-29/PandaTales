@@ -1,16 +1,19 @@
 """Payment API routes."""
 
+import hashlib
+import hmac
+import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import Response
 from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.common import success_response
+from app.common import get_logger, success_response
 from app.common.exceptions import BadRequestException, ForbiddenException, NotFoundException, UnauthorizedException
 from app.core.config import settings
 from app.core.security import get_current_user
@@ -27,6 +30,7 @@ from app.services.digital_book import DigitalBookService
 from app.services.storage import StorageService
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
+logger = get_logger(__name__)
 
 
 @router.post(
@@ -135,6 +139,113 @@ _SUPPORTED_FILE_TYPES = {"book", "cover"}
 
 _DOWNLOAD_TOKEN_TYPE = "digital_order_download"
 _DOWNLOAD_TOKEN_EXP_MINUTES = 15
+
+
+def _verify_razorpay_webhook_signature(*, body: bytes, signature: str | None) -> bool:
+    if not settings.RAZORPAY_WEBHOOK_SECRET:
+        logger.warning("razorpay_webhook_secret_missing")
+        return False
+    if not signature:
+        return False
+
+    expected = hmac.new(
+        settings.RAZORPAY_WEBHOOK_SECRET.encode(),
+        body,
+        hashlib.sha256,
+    ).hexdigest()
+    return hmac.compare_digest(expected, signature)
+
+
+async def _reconcile_order_from_webhook(
+    *,
+    db: AsyncSession,
+    event_type: str,
+    payment_entity: dict,
+) -> bool:
+    razorpay_payment_id = str(payment_entity.get("id") or "").strip()
+    razorpay_order_id = str(payment_entity.get("order_id") or "").strip()
+    payment_error = str(payment_entity.get("error_description") or payment_entity.get("error_reason") or "").strip() or None
+
+    if not razorpay_order_id and not razorpay_payment_id:
+        return False
+
+    order = None
+    if razorpay_order_id:
+        result = await db.execute(
+            select(DigitalBookOrder).where(DigitalBookOrder.razorpay_order_id == razorpay_order_id)
+        )
+        order = result.scalar_one_or_none()
+
+    if order is None and razorpay_payment_id:
+        result = await db.execute(
+            select(DigitalBookOrder).where(DigitalBookOrder.razorpay_payment_id == razorpay_payment_id)
+        )
+        order = result.scalar_one_or_none()
+
+    if order is None:
+        return False
+
+    if razorpay_payment_id:
+        order.razorpay_payment_id = razorpay_payment_id
+
+    if event_type == "payment.captured":
+        order.payment_status = "paid"
+        order.status = "paid"
+        order.payment_error = None
+        if order.paid_at is None:
+            order.paid_at = datetime.now(timezone.utc)
+    elif event_type == "payment.failed":
+        if order.payment_status != "paid":
+            order.payment_status = "failed"
+            order.status = "failed"
+            order.payment_error = payment_error or "Payment failed at gateway"
+    else:
+        return False
+
+    await db.commit()
+    return True
+
+
+@router.post(
+    "/razorpay/webhook",
+    status_code=status.HTTP_200_OK,
+    include_in_schema=False,
+)
+async def razorpay_webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Handle Razorpay webhooks and reconcile payment status for digital orders."""
+    signature = request.headers.get("X-Razorpay-Signature")
+    body = await request.body()
+
+    if not _verify_razorpay_webhook_signature(body=body, signature=signature):
+        raise UnauthorizedException("Invalid Razorpay webhook signature")
+
+    try:
+        payload = json.loads(body.decode("utf-8")) if body else {}
+    except json.JSONDecodeError as exc:
+        raise BadRequestException("Invalid webhook payload") from exc
+
+    event_type = str(payload.get("event") or "")
+    payment_entity = ((payload.get("payload") or {}).get("payment") or {}).get("entity") or {}
+
+    updated = await _reconcile_order_from_webhook(
+        db=db,
+        event_type=event_type,
+        payment_entity=payment_entity,
+    )
+
+    logger.info(
+        "razorpay_webhook_processed",
+        event=event_type,
+        updated=updated,
+        razorpay_order_id=payment_entity.get("order_id"),
+        razorpay_payment_id=payment_entity.get("id"),
+    )
+
+    # Always return 200 for validly signed events to avoid repeated retries.
+    return {"status": "ok", "updated": updated}
 
 
 def _create_download_token(*, user_id: str, order_id: int, file_type: str) -> str:
