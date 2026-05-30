@@ -49,7 +49,7 @@ from app.services.storage import StorageService
 logger = get_logger(__name__)
 
 
-GST_RATE_DIGITAL_PERCENT = 18
+GST_RATE_DIGITAL_PERCENT = 5
 SUPPORTED_ATTRIBUTE_OPTION_TYPES = {"book_type", "theme", "language", "genre"}
 BOOK_TYPE_SEQUENCE = [
     "digital coloring book",
@@ -237,7 +237,7 @@ class DigitalBookService:
                     file=book_file,
                     object_name=book_object_name,
                     content_type="application/pdf",
-                    max_size_mb=100,
+                    max_size_mb=6144,
                 )
                 uploaded_objects.append(book_object_name)
                 book.book_url = book_object_name
@@ -1523,7 +1523,7 @@ class DigitalBookService:
         pdf.drawRightString(summary_x + summary_w - 8, y - 78, f"INR {total_amount_paise / 100:.2f}")
 
         pdf.setFont("Helvetica", 8)
-        pdf.drawString(left, y - summary_h - 14, "GST summary: Digital products 18%.")
+        pdf.drawString(left, y - summary_h - 14, "GST summary: Digital products 5%.")
 
         pdf.showPage()
         pdf.save()
@@ -2021,7 +2021,7 @@ class DigitalBookService:
 
     @staticmethod
     def _gst_rate_for_digital_book(book: Book) -> int:
-        # Digital story books and digital coloring books are taxed at 18% GST.
+        # Digital story books and digital coloring books are taxed at 5% GST.
         _ = book
         return GST_RATE_DIGITAL_PERCENT
 

@@ -34,10 +34,10 @@ FORMAT_PRICES: dict[str, int] = {
 }
 
 # GST rates by format
-# - Digital purchases: 18%
+# - Digital purchases: 5%
 # - Physical books (softcover/hardcover): 0%
 GST_RATES_BY_FORMAT: dict[str, int] = {
-    "digital": 18,
+    "digital": 5,
     "softcover": 0,
     "hardcover": 0,
 }
@@ -619,7 +619,7 @@ class PaymentService:
         pdf.drawRightString(summary_x + summary_w - 8, y - 78, f"INR {total_amount_paise / 100:.2f}")
 
         pdf.setFont("Helvetica", 8)
-        pdf.drawString(left, y - summary_h - 14, "GST summary: Digital products 18%, physical books 0% (exempt).")
+        pdf.drawString(left, y - summary_h - 14, "GST summary: Digital products 5%, physical books 0% (exempt).")
 
         pdf.showPage()
         pdf.save()

@@ -66,24 +66,31 @@ class StorageService:
             ServiceUnavailableException: Upload failed
         """
         try:
-            # Read file content — UploadFile.read() is a coroutine in FastAPI
+            # Use streaming uploads to avoid loading large files into memory.
             if isinstance(file, UploadFile):
                 if content_type is None:
                     content_type = file.content_type or "application/octet-stream"
-                file_content = await file.read()
+                upload_stream = file.file
+                upload_stream.seek(0, io.SEEK_END)
+                file_size = upload_stream.tell()
+                upload_stream.seek(0)
                 await file.seek(0)
             else:
-                # BinaryIO — synchronous read
-                raw = file.read()
-                # Guard: if somehow we got a coroutine (shouldn't happen), await it
-                if asyncio.iscoroutine(raw):
-                    file_content = await raw
+                upload_stream = file
+                if hasattr(upload_stream, "seek") and hasattr(upload_stream, "tell"):
+                    current_pos = upload_stream.tell()
+                    upload_stream.seek(0, io.SEEK_END)
+                    file_size = upload_stream.tell()
+                    upload_stream.seek(0 if current_pos is None else current_pos)
                 else:
-                    file_content = raw
+                    # Fallback for non-seekable streams.
+                    raw = file.read()
+                    if asyncio.iscoroutine(raw):
+                        raw = await raw
+                    upload_stream = io.BytesIO(raw)
+                    file_size = len(raw)
                 if content_type is None:
                     content_type = "application/octet-stream"
-
-            file_size = len(file_content)
             
             # Validate file size
             if max_size_mb is not None:
@@ -103,7 +110,7 @@ class StorageService:
                 self.client.put_object,
                 self.bucket,
                 object_name,
-                io.BytesIO(file_content),
+                upload_stream,
                 file_size,
                 content_type or "application/octet-stream",
             )
