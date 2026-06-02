@@ -1,11 +1,13 @@
 """Digital books catalog API routes."""
 
+import mimetypes
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common import success_response
+from app.common.exceptions import NotFoundException
 from app.db.session import get_db
 from app.schemas.digital_book import (
     BookAttributeOptionCreateRequest,
@@ -14,6 +16,7 @@ from app.schemas.digital_book import (
     DigitalBookUpdateRequest,
 )
 from app.services.digital_book import DigitalBookService
+from app.services.storage import StorageService
 
 router = APIRouter(prefix="/digital-books", tags=["Digital Books"])
 
@@ -396,4 +399,28 @@ async def get_digital_book_preview_pdf(book_id: int, db: AsyncSession = Depends(
     data = await service.get_watermarked_preview(book_id)
     return success_response(data=data, message="Digital book preview generated successfully")
 
+
+@router.get(
+    "/images/{object_path:path}",
+    status_code=200,
+    summary="Proxy an image from storage",
+    description="Stream a stored image (category or book cover) through the API. No auth required.",
+    include_in_schema=False,
+)
+async def serve_storage_image(object_path: str) -> Response:
+    """Proxy MinIO/storage images so the browser can always reach them."""
+    storage = StorageService()
+    try:
+        data = await storage.download_file(object_path)
+    except NotFoundException:
+        raise HTTPException(status_code=404, detail="Image not found")
+    except Exception:
+        raise HTTPException(status_code=502, detail="Could not load image from storage")
+
+    content_type = mimetypes.guess_type(object_path)[0] or "image/jpeg"
+    return Response(
+        content=data,
+        media_type=content_type,
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
 

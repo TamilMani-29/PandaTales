@@ -1922,20 +1922,11 @@ class DigitalBookService:
             object_path = str(object_name).lstrip("/")
             return f"{public_base}/{settings.MINIO_BUCKET}/{object_path}"
 
-        try:
-            return await self.storage.get_file_url(
-                object_name,
-                expires=timedelta(hours=6),
-                check_exists=False,
-            )
-        except Exception:
-            logger.warning(
-                "digital_book_presign_failed",
-                book_id=book_id,
-                image_kind=image_kind,
-                object_name=object_name,
-            )
-            return None
+        # Fallback: serve through the API image proxy so the browser can always reach it.
+        # This avoids returning internal Docker hostnames (e.g. minio:9000) that are
+        # unreachable from the browser.
+        object_path = str(object_name).lstrip("/")
+        return f"/api/v1/digital-books/images/{object_path}"
 
     async def _presign_category_image_url(
         self,
@@ -1950,19 +1941,9 @@ class DigitalBookService:
             object_path = str(object_name).lstrip("/")
             return f"{public_base}/{settings.MINIO_BUCKET}/{object_path}"
 
-        try:
-            return await self.storage.get_file_url(
-                object_name,
-                expires=timedelta(hours=6),
-                check_exists=False,
-            )
-        except Exception:
-            logger.warning(
-                "category_image_presign_failed",
-                category_id=category_id,
-                object_name=object_name,
-            )
-            return None
+        # Fallback: serve through the API image proxy so the browser can always reach it.
+        object_path = str(object_name).lstrip("/")
+        return f"/api/v1/digital-books/images/{object_path}"
 
     def _generate_watermarked_pdf_sync(self, pdf_bytes: bytes, watermark_text: str) -> bytes:
         """Apply diagonal text watermark on every page of a PDF."""
