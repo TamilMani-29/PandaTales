@@ -1913,36 +1913,34 @@ class DigitalBookService:
             return "story"
         return None
 
-    async def _presign_url(self, object_name: str | None, book_id: int, image_kind: str) -> str | None:
+    async def _presign_url(self, object_name: str | None, _book_id: int, _image_kind: str) -> str | None:
         if not object_name:
             return None
 
-        public_base = (settings.MINIO_PUBLIC_BASE_URL or "").strip().rstrip("/")
-        if public_base:
-            object_path = str(object_name).lstrip("/")
-            return f"{public_base}/{settings.MINIO_BUCKET}/{object_path}"
+        raw = str(object_name).strip()
+        if raw.startswith("http://") or raw.startswith("https://"):
+            return raw
 
-        # Fallback: serve through the API image proxy so the browser can always reach it.
-        # This avoids returning internal Docker hostnames (e.g. minio:9000) that are
-        # unreachable from the browser.
-        object_path = str(object_name).lstrip("/")
+        # Always serve through API proxy so browser access is stable across
+        # environments even when direct MinIO/public URLs are misconfigured.
+        object_path = raw.lstrip("/")
         return f"/api/v1/digital-books/images/{object_path}"
 
     async def _presign_category_image_url(
         self,
         object_name: str | None,
-        category_id: int,
+        _category_id: int,
     ) -> str | None:
         if not object_name:
             return None
 
-        public_base = (settings.MINIO_PUBLIC_BASE_URL or "").strip().rstrip("/")
-        if public_base:
-            object_path = str(object_name).lstrip("/")
-            return f"{public_base}/{settings.MINIO_BUCKET}/{object_path}"
+        raw = str(object_name).strip()
+        if raw.startswith("http://") or raw.startswith("https://"):
+            return raw
 
-        # Fallback: serve through the API image proxy so the browser can always reach it.
-        object_path = str(object_name).lstrip("/")
+        # Always serve through API proxy so browser access is stable across
+        # environments even when direct MinIO/public URLs are misconfigured.
+        object_path = raw.lstrip("/")
         return f"/api/v1/digital-books/images/{object_path}"
 
     def _generate_watermarked_pdf_sync(self, pdf_bytes: bytes, watermark_text: str) -> bytes:
