@@ -223,7 +223,8 @@ export default function App(){
             color:c.color||"#6C5CE7",
             grad:c.grad||"linear-gradient(135deg,#6C5CE7,#A29BFE)",
             desc:c.description||"",
-            category_image_url:c.category_image_presigned_url||c.category_image_url||"",
+            category_image_url:c.category_image_url||"",
+            category_image_presigned_url:c.category_image_presigned_url||"",
             tags:Array.isArray(c.tags)?c.tags:[],
             personalizedTag:c.personalized_tag||"",
             label:c.label||"",
@@ -282,6 +283,36 @@ export default function App(){
     }
     return "DIGITAL STORY BOOK";
   };
+  const getImageCandidates=(...values)=>{
+    const unique=[];
+    const seen=new Set();
+    const push=(raw)=>{
+      const v=String(raw||"").trim();
+      if(!v||v==="null"||v==="undefined"||seen.has(v)) return;
+      seen.add(v);
+      unique.push(v);
+    };
+
+    const toProxyPath=(value)=>{
+      const v=String(value||"").trim();
+      if(!v) return "";
+      if(v.startsWith("/api/v1/digital-books/images/")) return v;
+
+      const minioMatch=v.match(/^\/minio\/[^/]+\/(.+)$/i);
+      if(minioMatch&&minioMatch[1]) return buildApiUrl(`/v1/digital-books/images/${minioMatch[1]}`);
+
+      if(!/^https?:\/\//i.test(v)&&!v.startsWith("/")) return buildApiUrl(`/v1/digital-books/images/${v}`);
+
+      return "";
+    };
+
+    values.forEach((value)=>{
+      push(value);
+      push(toProxyPath(value));
+    });
+
+    return unique;
+  };
   const getBookImageCandidates=(book)=>{
     const normalize=(value)=>{
       const v=String(value||"").trim();
@@ -294,7 +325,7 @@ export default function App(){
       normalize(book?.cover_image_presigned_url),
       normalize(book?.cover_image_url),
     ].filter(Boolean);
-    return Array.from(new Set(candidates));
+    return getImageCandidates(...candidates);
   };
   const resolveCollectionFromBackend=(collectionKey)=>{
     const normalizedKey=String(collectionKey||"").trim().toLowerCase();
@@ -485,12 +516,14 @@ export default function App(){
 
   const Card3D=({c})=>{
     const [tilt,setTilt]=useState({x:0,y:0,active:false});
-    const [categoryImageFailed,setCategoryImageFailed]=useState(false);
-    const categoryImage = c?.category_image_url || "";
-    const showCategoryImage = Boolean(categoryImage) && !categoryImageFailed;
+    const [categoryImageIndex,setCategoryImageIndex]=useState(0);
+    const categoryCandidates=getImageCandidates(c?.category_image_presigned_url,c?.category_image_url);
+    const categoryImage=categoryCandidates[categoryImageIndex]||"";
+    const showCategoryImage = Boolean(categoryImage);
     const highlightX = tilt.mx ?? 50;
     const highlightY = tilt.my ?? 50;
     const cardHighlight = `radial-gradient(circle at ${highlightX}% ${highlightY}%, rgba(255,255,255,.35), transparent 55%)`;
+    useEffect(()=>{setCategoryImageIndex(0);},[c?.id,c?.category_image_presigned_url,c?.category_image_url]);
     const onMove=e=>{
       const r=e.currentTarget.getBoundingClientRect();
       const px=(e.clientX-r.left)/r.width-.5;
@@ -510,7 +543,7 @@ export default function App(){
             <img
               src={categoryImage}
               alt={`${c.name} category`}
-              onError={()=>setCategoryImageFailed(true)}
+              onError={()=>setCategoryImageIndex((idx)=>Math.min(idx+1,categoryCandidates.length))}
               style={{width:"100%",height:"100%",objectFit:"cover"}}
             />
           ) : null}

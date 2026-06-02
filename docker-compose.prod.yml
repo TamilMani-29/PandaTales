@@ -58,6 +58,7 @@ services:
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       MINIO_BUCKET: ${MINIO_BUCKET:-pandatales}
       MINIO_SECURE: "false"
+      MINIO_PUBLIC_BASE_URL: ${MINIO_PUBLIC_BASE_URL:-/minio}
       
       # JWT - Production (REQUIRED - set strong secrets in .env.prod)
       SECRET_KEY: ${SECRET_KEY}
