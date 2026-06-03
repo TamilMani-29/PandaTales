@@ -17,7 +17,7 @@ class DigitalBookCreateRequest(BaseModel):
     age_group: str | None = Field(None, max_length=32)
     total_pages: int | None = Field(None, ge=1)
     book_type: str = Field(..., min_length=1, max_length=50)
-    theme: str = Field(..., min_length=1, max_length=50)
+    style: str = Field(..., min_length=1, max_length=50)
     language: str = Field("english", min_length=1, max_length=50)
     genre: str = Field(..., min_length=1, max_length=100)
     price: Decimal | None = Field(None, ge=0)
@@ -38,7 +38,7 @@ class DigitalBookUpdateRequest(BaseModel):
     age_group: str | None = Field(None, max_length=32)
     total_pages: int | None = Field(None, ge=1)
     book_type: str | None = Field(None, min_length=1, max_length=50)
-    theme: str | None = Field(None, min_length=1, max_length=50)
+    style: str | None = Field(None, min_length=1, max_length=50)
     language: str | None = Field(None, min_length=1, max_length=50)
     genre: str | None = Field(None, min_length=1, max_length=100)
     price: Decimal | None = Field(None, ge=0)
@@ -96,7 +96,7 @@ class BookCategoryResponse(BaseModel):
 class BookAttributeOptionCreateRequest(BaseModel):
     """Payload for adding admin-managed dropdown options."""
 
-    option_type: str = Field(..., pattern="^(book_type|theme|language|genre)$")
+    option_type: str = Field(..., pattern="^(book_type|style|language|genre)$")
     value: str = Field(..., min_length=1, max_length=100)
 
 
@@ -133,7 +133,7 @@ class DigitalBookResponse(BaseModel):
     book_url: str | None
     total_pages: int | None
     book_type: str | None
-    theme: str | None
+    style: str | None
     language: str | None
     genre_id: int | None
     genre_name: str | None

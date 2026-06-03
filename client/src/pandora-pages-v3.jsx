@@ -610,11 +610,11 @@ export default function App(){
         <div style={{padding:"16px 18px 18px",transform:"translateZ(20px)",position:"relative",display:"flex",flexDirection:"column",minHeight:200}}>
           <h3 style={{fontFamily:"'Baloo 2',cursive",fontSize:"1.05rem",color:D,margin:"0 0 5px",lineHeight:1.25}}>{b.title}</h3>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:7}}>
-            <div style={{display:"flex",alignItems:"center",gap:5}}><Stars r={b.rat}/><span style={{fontSize:".7rem",color:"#999",fontWeight:600}}>{b.rat}</span></div>
+            <div style={{display:"flex",alignItems:"center",gap:5}}><Stars r={b.rat}/><span style={{fontSize:".7rem",color:"#999",fontWeight:600}}>{b.rat} <span style={{color:"#bbb"}}>({b.rev} reviews)</span></span></div>
             <span style={{fontSize:".7rem",color:"#999",fontWeight:700}}>{b.bought_count || 0} bought</span>
           </div>
           <p style={{fontSize:".8rem",color:"#777",lineHeight:1.55,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden",margin:"0 0 10px"}}>{b.desc}</p>
-          <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:10}}>{[b.age,`${b.pages}${b.pages===1?" board":" pg"}`].map(t=><span key={t} style={{background:`${col.color}10`,color:col.color,padding:"3px 9px",borderRadius:10,fontSize:".68rem",fontWeight:700}}>{t}</span>)}</div>
+          <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:10}}>{[b.age,`${b.pages}${b.pages===1?" board":" pg"}`,b.style||null,b.genre_name||null].filter(Boolean).map(t=><span key={t} style={{background:`${col.color}10`,color:col.color,padding:"3px 9px",borderRadius:10,fontSize:".68rem",fontWeight:700}}>{t}</span>)}</div>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",paddingTop:8,borderTop:`1px solid ${col.color}15`,marginTop:"auto"}}>
             <span style={{fontSize:".75rem",color:"#aaa",fontWeight:600}}>{isP?"Free preview":"Instant delivery"}</span>
             <div style={{background:col.grad,color:"#fff",padding:"6px 14px",borderRadius:30,fontWeight:800,fontSize:".78rem",display:"flex",alignItems:"center",gap:5,boxShadow:`0 6px 14px ${col.color}44`}}>{isP?"Personalize":"Buy"} <span style={{transition:"transform .3s",display:"inline-block",transform:tilt.active?"translateX(3px)":"translateX(0)"}}>→</span></div>
@@ -1304,7 +1304,7 @@ export default function App(){
         </div>
         <div style={{padding:"22px 26px 28px"}}>
           <h2 style={{fontFamily:"'Baloo 2',cursive",fontSize:"1.4rem",color:D,margin:"0 0 4px"}}>{b.title}</h2>
-          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:12}}><Stars r={b.rat}/><span style={{fontSize:".85rem",fontWeight:700,color:"#444"}}>{b.rat}</span></div>
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:12}}><Stars r={b.rat}/><span style={{fontSize:".85rem",fontWeight:700,color:"#444"}}>{b.rat}</span>{b.rev>0?<span style={{fontSize:".8rem",color:"#999",fontWeight:500}}>({b.rev} reviews)</span>:null}</div>
           <p style={{fontSize:".92rem",color:"#666",lineHeight:1.7,marginBottom:20}}>{b.desc}</p>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:22}}>
             {[["Collection",c.name,c.emoji],["Style",b.style || "Standard","🎨"],["Age",b.age || "All ages","👶"],["Pages",`${b.pages}${b.pages===1?" board":" pg"}`,"📄"]].map(([l,v,ic])=><div key={l} style={{background:"#F8F5FF",borderRadius:12,padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:18}}>{ic}</span><div><div style={{fontSize:".68rem",color:"#bbb",fontWeight:600,textTransform:"uppercase"}}>{l}</div><div style={{fontSize:".85rem",fontWeight:700,color:"#333"}}>{v}</div></div></div>)}

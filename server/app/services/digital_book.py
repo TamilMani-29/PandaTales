@@ -50,7 +50,7 @@ logger = get_logger(__name__)
 
 
 GST_RATE_DIGITAL_PERCENT = 5
-SUPPORTED_ATTRIBUTE_OPTION_TYPES = {"book_type", "theme", "language", "genre"}
+SUPPORTED_ATTRIBUTE_OPTION_TYPES = {"book_type", "style", "language", "genre"}
 BOOK_TYPE_SEQUENCE = [
     "digital coloring book",
     "digital story book",
@@ -182,7 +182,7 @@ class DigitalBookService:
                     "Personalized book must be either a story book or a coloring book"
                 )
         book_type_id = await self._normalize_and_validate_attribute_option("book_type", normalized_book_type)
-        theme_id = await self._normalize_and_validate_attribute_option("theme", data.theme)
+        style_id = await self._normalize_and_validate_attribute_option("style", data.style)
         language_id = await self._normalize_and_validate_attribute_option("language", data.language)
 
         book = Book(
@@ -193,7 +193,7 @@ class DigitalBookService:
             age_label=(str(data.age_group).strip() if data.age_group else None),
             total_pages=data.total_pages,
             book_type_id=book_type_id,
-            theme_id=theme_id,
+            theme_id=style_id,
             language_id=language_id,
             genre_id=genre.id,
             price=float(data.price) if isinstance(data.price, Decimal) else data.price,
@@ -497,7 +497,7 @@ class DigitalBookService:
         rows = result.all()
 
         items: list[dict] = []
-        for book, genre_name, category_name, category_tag, category_description, book_type_val, theme_val, language_val in rows:
+        for book, genre_name, category_name, category_tag, category_description, book_type_val, style_val, language_val in rows:
             items.append(
                 await self._to_response_dict(
                     book,
@@ -507,7 +507,7 @@ class DigitalBookService:
                     category_tag=category_tag,
                     category_description=category_description,
                     book_type=book_type_val,
-                    theme=theme_val,
+                    style=style_val,
                     language=language_val,
                 )
             )
@@ -541,7 +541,7 @@ class DigitalBookService:
         if not row:
             raise NotFoundException("Book not found")
 
-        book, genre_name, category_name, category_tag, category_description, book_type_val, theme_val, language_val = row
+        book, genre_name, category_name, category_tag, category_description, book_type_val, style_val, language_val = row
         return await self._to_response_dict(
             book,
             genre_name=genre_name,
@@ -550,7 +550,7 @@ class DigitalBookService:
             category_tag=category_tag,
             category_description=category_description,
             book_type=book_type_val,
-            theme=theme_val,
+            style=style_val,
             language=language_val,
         )
 
@@ -757,7 +757,7 @@ class DigitalBookService:
             normalized_book_type = self._normalize_book_type_value(data.book_type)
             book.book_type_id = await self._normalize_and_validate_attribute_option("book_type", normalized_book_type)
         if data.theme is not None:
-            book.theme_id = await self._normalize_and_validate_attribute_option("theme", data.theme)
+            book.theme_id = await self._normalize_and_validate_attribute_option("style", data.style)
         if data.language is not None:
             book.language_id = await self._normalize_and_validate_attribute_option("language", data.language)
         if data.genre is not None:
@@ -773,7 +773,6 @@ class DigitalBookService:
             book.download_count = data.download_count
         if data.is_bestseller is not None:
             book.is_bestseller = data.is_bestseller
-
         book_type_value = await self._get_attribute_option_value(book.book_type_id)
         if not book_type_value:
             raise BadRequestException("book_type is required")
@@ -830,7 +829,7 @@ class DigitalBookService:
         result = await self.db.execute(query)
         row = result.first()
         if row:
-            book_row, genre_name, category_name, category_tag, category_description, book_type_val, theme_val, language_val = row
+            book_row, genre_name, category_name, category_tag, category_description, book_type_val, style_val, language_val = row
             return await self._to_response_dict(
                 book_row,
                 genre_name=genre_name,
@@ -839,7 +838,7 @@ class DigitalBookService:
                 category_tag=category_tag,
                 category_description=category_description,
                 book_type=book_type_val,
-                theme=theme_val,
+                style=style_val,
                 language=language_val,
             )
 
@@ -895,7 +894,7 @@ class DigitalBookService:
         )
         option_rows = options_result.scalars().all()
 
-        grouped: dict[str, list[str]] = {"book_type": [], "theme": [], "language": []}
+        grouped: dict[str, list[str]] = {"book_type": [], "style": [], "language": []}
         for row in option_rows:
             values = grouped.get(row.option_type)
             if values is not None:
@@ -903,7 +902,7 @@ class DigitalBookService:
 
         return {
             "book_types": grouped["book_type"],
-            "themes": grouped["theme"],
+            "styles": grouped["style"],
             "languages": grouped["language"],
             "genres": genres,
         }
@@ -913,7 +912,7 @@ class DigitalBookService:
         filter_options = await self.get_filter_options()
         return {
             "book_type": BOOK_TYPE_SEQUENCE,
-            "theme": filter_options.get("themes", []),
+            "style": filter_options.get("styles", []),
             "language": filter_options.get("languages", []),
             "genre": filter_options.get("genres", []),
         }
@@ -973,7 +972,7 @@ class DigitalBookService:
 
         in_use_column = {
             "book_type": Book.book_type_id,
-            "theme": Book.theme_id,
+            "style": Book.theme_id,
             "language": Book.language_id,
         }.get(normalized_type)
 
@@ -1916,7 +1915,7 @@ class DigitalBookService:
         category_tag: str | None = None,
         category_description: str | None = None,
         book_type: str | None = None,
-        theme: str | None = None,
+        style: str | None = None,
         language: str | None = None,
     ) -> dict:
         cover_presigned_url = await self._presign_url(book.cover_image_url, book.id, "cover")
@@ -1975,7 +1974,7 @@ class DigitalBookService:
             "theme_id": book.theme_id,
             "language_id": book.language_id,
             "book_type": normalized_response_book_type,
-            "theme": theme,
+            "style": style,
             "language": language,
             "genre_id": book.genre_id,
             "genre_name": genre_name,

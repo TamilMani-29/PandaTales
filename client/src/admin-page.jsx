@@ -213,8 +213,9 @@ export default function AdminPage() {
     download_count: "0",
     is_bestseller: false,
     book_type: "digital story book",
-    theme: "human",
+    style: "",
     language: "english",
+    total_ratings: "0",
   });
   const [bookFiles, setBookFiles] = useState({
     cover_image: null,
@@ -228,7 +229,7 @@ export default function AdminPage() {
   });
   const [bookAttributeOptions, setBookAttributeOptions] = useState({
     book_type: BOOK_TYPE_OPTIONS,
-    theme: ["human"],
+    style: [],
     language: ["english"],
     genre: ["fantasy"],
   });
@@ -284,7 +285,7 @@ export default function AdminPage() {
       setBooks(Array.isArray(bookRows) ? bookRows : []);
       setBookAttributeOptions({
         book_type: BOOK_TYPE_OPTIONS,
-        theme: Array.isArray(attrOptions?.theme) && attrOptions.theme.length ? attrOptions.theme : ["human"],
+        style: Array.isArray(attrOptions?.style) && attrOptions.style.length ? attrOptions.style : [],
         language: Array.isArray(attrOptions?.language) && attrOptions.language.length ? attrOptions.language : ["english"],
         genre: Array.isArray(attrOptions?.genre) && attrOptions.genre.length ? attrOptions.genre : ["fantasy"],
       });
@@ -487,8 +488,9 @@ export default function AdminPage() {
       download_count: "0",
       is_bestseller: false,
       book_type: getDefaultOption("book_type", "digital story book"),
-      theme: getDefaultOption("theme", "human"),
+      style: getDefaultOption("style", ""),
       language: getDefaultOption("language", "english"),
+      total_ratings: "0",
     });
     setBookFiles({
       cover_image: null,
@@ -520,8 +522,9 @@ export default function AdminPage() {
       download_count: b.download_count != null ? String(b.download_count) : "0",
       is_bestseller: !!b.is_bestseller,
       book_type: b.book_type || "digital story book",
-      theme: b.theme || "human",
+      style: b.style || "",
       language: b.language || "english",
+      total_ratings: b.total_ratings != null ? String(b.total_ratings) : b.rev != null ? String(b.rev) : "0",
     });
     setBookFiles({
       cover_image: null,
@@ -561,11 +564,12 @@ export default function AdminPage() {
         if (bookForm.age_group) fd.append("age_group", String(bookForm.age_group).trim());
         if (bookForm.total_pages) fd.append("total_pages", String(Number(bookForm.total_pages)));
         fd.append("book_type", bookForm.book_type);
-        fd.append("theme", bookForm.theme);
+        fd.append("style", bookForm.style);
         fd.append("language", bookForm.language);
         fd.append("genre", bookForm.genre);
         if (bookForm.price) fd.append("price", String(Number(bookForm.price)));
         if (bookForm.rating) fd.append("rating", String(Number(bookForm.rating)));
+        if (bookForm.total_ratings) fd.append("total_ratings", String(Number(bookForm.total_ratings)));
         if (bookForm.download_count) fd.append("download_count", String(Number(bookForm.download_count)));
         fd.append("is_bestseller", String(!!bookForm.is_bestseller));
         fd.append("is_personalized", String(derivedIsPersonalized));
@@ -590,11 +594,12 @@ export default function AdminPage() {
         fd.append("genre", bookForm.genre || "");
         if (bookForm.price) fd.append("price", String(Number(bookForm.price)));
         if (bookForm.rating) fd.append("rating", String(Number(bookForm.rating)));
+        if (bookForm.total_ratings) fd.append("total_ratings", String(Number(bookForm.total_ratings)));
         if (bookForm.download_count) fd.append("download_count", String(Number(bookForm.download_count)));
         fd.append("is_bestseller", String(!!bookForm.is_bestseller));
         fd.append("is_personalized", String(derivedIsPersonalized));
         fd.append("book_type", bookForm.book_type || "");
-        fd.append("theme", bookForm.theme || "");
+        fd.append("style", bookForm.style || "");
         fd.append("language", bookForm.language || "");
         if (bookFiles.cover_image) fd.append("cover_image", bookFiles.cover_image);
         if (bookFiles.front_image) fd.append("front_image", bookFiles.front_image);
@@ -1234,9 +1239,9 @@ export default function AdminPage() {
                 </select>
               </div>
               <div style={{ display: "grid", gap: 6 }}>
-                <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Theme</label>
-                <select style={inputStyle} value={bookForm.theme} onChange={(e) => setBookForm((s) => ({ ...s, theme: e.target.value }))}>
-                  {(bookAttributeOptions.theme || []).map((value) => <option key={value} value={value}>{titleCase(value)}</option>)}
+                <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Style</label>
+                <select style={inputStyle} value={bookForm.style} onChange={(e) => setBookForm((s) => ({ ...s, style: e.target.value }))}>
+                  {(bookAttributeOptions.style || []).map((value) => <option key={value} value={value}>{titleCase(value)}</option>)}
                 </select>
               </div>
               <div style={{ display: "grid", gap: 6 }}>
@@ -1282,6 +1287,10 @@ export default function AdminPage() {
               <div style={{ display: "grid", gap: 6 }}>
                 <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Emoji</label>
                 <input style={inputStyle} placeholder="📖" value={bookForm.emoji} onChange={(e) => setBookForm((s) => ({ ...s, emoji: e.target.value }))} />
+              </div>
+              <div style={{ display: "grid", gap: 6 }}>
+                <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Reviewer Count</label>
+                <input style={inputStyle} placeholder="0" type="number" min="0" value={bookForm.total_ratings} onChange={(e) => setBookForm((s) => ({ ...s, total_ratings: e.target.value }))} />
               </div>
               <div style={{ gridColumn: "1/-1" }}>
                 <label style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, color: "#5b4f7c", fontSize: 13, cursor: "pointer" }}>
@@ -1342,7 +1351,7 @@ export default function AdminPage() {
             {optionsMsg && (
               <div style={{ padding: "8px 14px", borderRadius: 10, background: optionsMsg.startsWith("✅") ? "#F0FDF4" : "#FEF2F2", color: optionsMsg.startsWith("✅") ? "#166534" : "#b91c1c", fontWeight: 600, fontSize: 13 }}>{optionsMsg}</div>
             )}
-            {[["genre", "🎭 Genre"], ["theme", "🎨 Theme"], ["language", "🌐 Language"]].map(([type, label]) => (
+            {[["genre", "🎭 Genre"], ["style", "🎨 Style"], ["language", "🌐 Language"]].map(([type, label]) => (
               <div key={type} style={{ background: "#FAFAFA", borderRadius: 14, padding: "16px 18px", border: "1px solid #E5E7EB" }}>
                 <div style={{ fontWeight: 700, color: "#374151", fontSize: 14, marginBottom: 10 }}>{label}</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
