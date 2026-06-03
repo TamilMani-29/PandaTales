@@ -33,6 +33,7 @@ async def create_digital_book(
     description: str | None = Form(None),
     category_id: int | None = Form(None, ge=1),
     emoji: str | None = Form(None, max_length=16),
+    age_group: str | None = Form(None, max_length=32),
     total_pages: int | None = Form(None, ge=1),
     book_type: str = Form(..., min_length=1, max_length=50),
     theme: str = Form(..., min_length=1, max_length=50),
@@ -47,6 +48,10 @@ async def create_digital_book(
     cover_image: UploadFile = File(...),
     front_image: UploadFile | None = File(None),
     back_image: UploadFile | None = File(None),
+    page_1_image: UploadFile | None = File(None),
+    page_2_image: UploadFile | None = File(None),
+    page_3_image: UploadFile | None = File(None),
+    page_4_image: UploadFile | None = File(None),
     book_file: UploadFile | None = File(None),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
@@ -56,6 +61,7 @@ async def create_digital_book(
         description=description,
         category_id=category_id,
         emoji=emoji,
+        age_group=age_group,
         total_pages=total_pages,
         book_type=book_type,
         theme=theme,
@@ -75,6 +81,10 @@ async def create_digital_book(
         cover_image=cover_image,
         front_image=front_image,
         back_image=back_image,
+        page_1_image=page_1_image,
+        page_2_image=page_2_image,
+        page_3_image=page_3_image,
+        page_4_image=page_4_image,
         book_file=book_file,
     )
     created_data = await service.get_book(book.id)
@@ -342,12 +352,81 @@ async def get_digital_book_by_id(book_id: int, db: AsyncSession = Depends(get_db
 )
 async def update_digital_book(
     book_id: int,
-    payload: DigitalBookUpdateRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """Update digital book metadata fields."""
+    """Update digital book metadata and optionally replace uploaded files."""
     service = DigitalBookService(db)
-    data = await service.update_book(book_id, payload)
+
+    def _to_opt_str(value: Any) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip()
+        return text or None
+
+    def _to_opt_int(value: Any) -> int | None:
+        text = _to_opt_str(value)
+        return int(text) if text is not None else None
+
+    def _to_opt_float(value: Any) -> float | None:
+        text = _to_opt_str(value)
+        return float(text) if text is not None else None
+
+    def _to_opt_bool(value: Any) -> bool | None:
+        text = _to_opt_str(value)
+        if text is None:
+            return None
+        lowered = text.lower()
+        if lowered in {"1", "true", "yes", "on"}:
+            return True
+        if lowered in {"0", "false", "no", "off"}:
+            return False
+        return None
+
+    content_type = (request.headers.get("content-type") or "").lower()
+    if "multipart/form-data" in content_type:
+        form = await request.form()
+        payload = DigitalBookUpdateRequest(
+            book_name=_to_opt_str(form.get("book_name")),
+            description=_to_opt_str(form.get("description")),
+            category_id=_to_opt_int(form.get("category_id")),
+            emoji=_to_opt_str(form.get("emoji")),
+            age_group=_to_opt_str(form.get("age_group")),
+            total_pages=_to_opt_int(form.get("total_pages")),
+            book_type=_to_opt_str(form.get("book_type")),
+            theme=_to_opt_str(form.get("theme")),
+            language=_to_opt_str(form.get("language")),
+            genre=_to_opt_str(form.get("genre")),
+            price=_to_opt_float(form.get("price")),
+            rating=_to_opt_float(form.get("rating")),
+            total_ratings=_to_opt_int(form.get("total_ratings")),
+            download_count=_to_opt_int(form.get("download_count")),
+            is_bestseller=_to_opt_bool(form.get("is_bestseller")),
+            is_personalized=_to_opt_bool(form.get("is_personalized")),
+        )
+
+        def _file(name: str) -> UploadFile | None:
+            candidate = form.get(name)
+            if candidate is None or not hasattr(candidate, "filename"):
+                return None
+            return candidate if getattr(candidate, "filename", "") else None
+
+        data = await service.update_book_with_files(
+            book_id,
+            payload,
+            cover_image=_file("cover_image"),
+            front_image=_file("front_image"),
+            back_image=_file("back_image"),
+            page_1_image=_file("page_1_image"),
+            page_2_image=_file("page_2_image"),
+            page_3_image=_file("page_3_image"),
+            page_4_image=_file("page_4_image"),
+            book_file=_file("book_file"),
+        )
+    else:
+        payload = DigitalBookUpdateRequest.model_validate(await request.json())
+        data = await service.update_book(book_id, payload)
+
     return success_response(data=data, message="Digital book updated successfully")
 
 

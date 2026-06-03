@@ -14,6 +14,7 @@ class DigitalBookCreateRequest(BaseModel):
     description: str | None = None
     category_id: int | None = Field(None, ge=1)
     emoji: str | None = Field(None, max_length=16)
+    age_group: str | None = Field(None, max_length=32)
     total_pages: int | None = Field(None, ge=1)
     book_type: str = Field(..., min_length=1, max_length=50)
     theme: str = Field(..., min_length=1, max_length=50)
@@ -34,6 +35,7 @@ class DigitalBookUpdateRequest(BaseModel):
     description: str | None = None
     category_id: int | None = Field(None, ge=1)
     emoji: str | None = Field(None, max_length=16)
+    age_group: str | None = Field(None, max_length=32)
     total_pages: int | None = Field(None, ge=1)
     book_type: str | None = Field(None, min_length=1, max_length=50)
     theme: str | None = Field(None, min_length=1, max_length=50)
@@ -120,6 +122,14 @@ class DigitalBookResponse(BaseModel):
     front_image_presigned_url: str | None
     back_image_url: str | None
     back_image_presigned_url: str | None
+    page_1_image_url: str | None
+    page_1_image_presigned_url: str | None
+    page_2_image_url: str | None
+    page_2_image_presigned_url: str | None
+    page_3_image_url: str | None
+    page_3_image_presigned_url: str | None
+    page_4_image_url: str | None
+    page_4_image_presigned_url: str | None
     book_url: str | None
     total_pages: int | None
     book_type: str | None
@@ -137,6 +147,7 @@ class DigitalBookResponse(BaseModel):
     desc: str | None
     pages: int | None
     age: str | None
+    age_group: str | None
     rat: float
     rev: int
 

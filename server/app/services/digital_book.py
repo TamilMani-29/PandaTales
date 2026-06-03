@@ -121,10 +121,15 @@ class DigitalBookService:
     async def create_book(
         self,
         data: DigitalBookCreateRequest,
+        *,
         cover_image,
-        front_image,
-        back_image,
-        book_file,
+        front_image=None,
+        back_image=None,
+        page_1_image=None,
+        page_2_image=None,
+        page_3_image=None,
+        page_4_image=None,
+        book_file=None,
     ) -> Book:
         """Create digital book, upload files to MinIO, and persist object paths."""
         if not cover_image.content_type or not cover_image.content_type.startswith("image/"):
@@ -135,16 +140,23 @@ class DigitalBookService:
         ):
             raise BadRequestException("front_image must be an image file")
 
-        if back_image is not None and (
-            not back_image.content_type or not back_image.content_type.startswith("image/")
-        ):
-            raise BadRequestException("back_image must be an image file")
 
         normalized_book_type = self._normalize_book_type_value(data.book_type)
         derived_is_personalized = self._is_personalized_book_type(normalized_book_type)
         if data.is_personalized != derived_is_personalized:
             raise BadRequestException("is_personalized must match selected book_type")
 
+        page_uploads = [
+            ("page_1_image", page_1_image),
+            ("page_2_image", page_2_image),
+            ("page_3_image", page_3_image),
+            ("page_4_image", page_4_image),
+        ]
+        for page_name, page_file in page_uploads:
+            if page_file is not None and (
+                not page_file.content_type or not page_file.content_type.startswith("image/")
+            ):
+                raise BadRequestException(f"{page_name} must be an image file")
         if book_file is not None:
             book_ext = Path(book_file.filename or "").suffix.lower()
             if book_ext != ".pdf":
@@ -178,6 +190,7 @@ class DigitalBookService:
             description=data.description,
             category_id=normalized_category_id,
             emoji=(data.emoji.strip() if data.emoji else None),
+            age_label=(str(data.age_group).strip() if data.age_group else None),
             total_pages=data.total_pages,
             book_type_id=book_type_id,
             theme_id=theme_id,
@@ -204,6 +217,12 @@ class DigitalBookService:
             back_ext = Path(back_image.filename or "").suffix.lower() if back_image else cover_ext
             front_object_name = f"digital-books/front_images/{slug}-{book.id}{front_ext or '.jpg'}"
             back_object_name = f"digital-books/back_images/{slug}-{book.id}{back_ext or '.jpg'}"
+            page_object_names: dict[str, str] = {}
+            for idx, (_, page_file) in enumerate(page_uploads, start=1):
+                if page_file is None:
+                    continue
+                page_ext = Path(page_file.filename or "").suffix.lower() or ".jpg"
+                page_object_names[f"page_{idx}_image_url"] = f"digital-books/page_images/{slug}-{book.id}-page-{idx}{page_ext}"
             book_object_name = f"digital-books/books/{slug}-{book.id}.pdf"
 
             await self.storage.upload_file(
@@ -231,6 +250,19 @@ class DigitalBookService:
                     max_size_mb=10,
                 )
                 uploaded_objects.append(back_object_name)
+            for idx, (page_name, page_file) in enumerate(page_uploads, start=1):
+                if page_file is None:
+                    continue
+                object_name = page_object_names.get(f"page_{idx}_image_url")
+                if not object_name:
+                    continue
+                await self.storage.upload_file(
+                    file=page_file,
+                    object_name=object_name,
+                    content_type=page_file.content_type,
+                    max_size_mb=10,
+                )
+                uploaded_objects.append(object_name)
 
             if book_file is not None:
                 await self.storage.upload_file(
@@ -245,6 +277,10 @@ class DigitalBookService:
             book.cover_image_url = cover_object_name
             book.front_image_url = front_object_name if front_image else cover_object_name
             book.back_image_url = back_object_name if back_image else cover_object_name
+            book.page_1_image_url = page_object_names.get("page_1_image_url")
+            book.page_2_image_url = page_object_names.get("page_2_image_url")
+            book.page_3_image_url = page_object_names.get("page_3_image_url")
+            book.page_4_image_url = page_object_names.get("page_4_image_url")
 
             await self.db.commit()
             await self.db.refresh(book)
@@ -259,6 +295,125 @@ class DigitalBookService:
                     logger.warning("digital_book_cleanup_failed", object_name=object_name)
 
             raise
+
+    async def update_book_with_files(
+        self,
+        book_id: int,
+        data: DigitalBookUpdateRequest,
+        *,
+        cover_image=None,
+        front_image=None,
+        back_image=None,
+        page_1_image=None,
+        page_2_image=None,
+        page_3_image=None,
+        page_4_image=None,
+        book_file=None,
+    ) -> dict:
+        """Update metadata and optionally replace uploaded files for a digital book."""
+        # First apply metadata validation/update logic.
+        await self.update_book(book_id, data)
+
+        book = await self.db.get(Book, book_id)
+        if not book:
+            raise NotFoundException("Book not found")
+
+        image_files = [
+            ("cover_image_url", cover_image),
+            ("front_image_url", front_image),
+            ("back_image_url", back_image),
+            ("page_1_image_url", page_1_image),
+            ("page_2_image_url", page_2_image),
+            ("page_3_image_url", page_3_image),
+            ("page_4_image_url", page_4_image),
+        ]
+
+        for field_name, image_file in image_files:
+            if image_file is not None and (
+                not image_file.content_type or not image_file.content_type.startswith("image/")
+            ):
+                raise BadRequestException(f"{field_name.replace('_url', '')} must be an image file")
+
+        if book_file is not None:
+            book_ext = Path(book_file.filename or "").suffix.lower()
+            if book_ext != ".pdf":
+                raise BadRequestException("book_file must be a PDF")
+
+        has_file_updates = any(file_obj is not None for _, file_obj in image_files) or book_file is not None
+        if not has_file_updates:
+            return await self.get_book(book_id)
+
+        slug = slugify(book.book_name) or f"book-{book.id}"
+        uploaded_objects: list[str] = []
+        old_objects: list[str] = []
+
+        folder_map = {
+            "cover_image_url": "cover_images",
+            "front_image_url": "front_images",
+            "back_image_url": "back_images",
+            "page_1_image_url": "page_images",
+            "page_2_image_url": "page_images",
+            "page_3_image_url": "page_images",
+            "page_4_image_url": "page_images",
+        }
+
+        try:
+            for field_name, image_file in image_files:
+                if image_file is None:
+                    continue
+
+                ext = Path(image_file.filename or "").suffix.lower() or ".jpg"
+                suffix = ""
+                if field_name.startswith("page_"):
+                    page_num = field_name.split("_")[1]
+                    suffix = f"-page-{page_num}"
+                object_name = f"digital-books/{folder_map[field_name]}/{slug}-{book.id}{suffix}-{uuid4().hex[:8]}{ext}"
+
+                await self.storage.upload_file(
+                    file=image_file,
+                    object_name=object_name,
+                    content_type=image_file.content_type,
+                    max_size_mb=10,
+                )
+                uploaded_objects.append(object_name)
+
+                old_value = getattr(book, field_name, None)
+                if old_value and old_value != object_name:
+                    old_objects.append(old_value)
+                setattr(book, field_name, object_name)
+
+            if book_file is not None:
+                pdf_object_name = f"digital-books/books/{slug}-{book.id}-{uuid4().hex[:8]}.pdf"
+                await self.storage.upload_file(
+                    file=book_file,
+                    object_name=pdf_object_name,
+                    content_type="application/pdf",
+                    max_size_mb=6144,
+                )
+                uploaded_objects.append(pdf_object_name)
+
+                if book.book_url and book.book_url != pdf_object_name:
+                    old_objects.append(book.book_url)
+                book.book_url = pdf_object_name
+
+            await self.db.commit()
+            await self.db.refresh(book)
+        except Exception:
+            await self.db.rollback()
+            for object_name in uploaded_objects:
+                try:
+                    await self.storage.delete_file(object_name)
+                except Exception:
+                    logger.warning("digital_book_update_cleanup_failed", object_name=object_name)
+            raise
+
+        for object_name in old_objects:
+            try:
+                await self.storage.delete_file(object_name)
+            except Exception:
+                logger.warning("digital_book_old_asset_delete_failed", object_name=object_name)
+
+        return await self.get_book(book_id)
 
     async def list_books(
         self,
@@ -594,6 +749,8 @@ class DigitalBookService:
             book.category_id = await self._normalize_and_validate_category_id(data.category_id)
         if data.emoji is not None:
             book.emoji = data.emoji.strip()
+        if data.age_group is not None:
+            book.age_label = str(data.age_group).strip() or None
         if data.total_pages is not None:
             book.total_pages = data.total_pages
         if data.book_type is not None:
@@ -1765,6 +1922,10 @@ class DigitalBookService:
         cover_presigned_url = await self._presign_url(book.cover_image_url, book.id, "cover")
         front_presigned_url = await self._presign_url(book.front_image_url, book.id, "front")
         back_presigned_url = await self._presign_url(book.back_image_url, book.id, "back")
+        page_1_presigned_url = await self._presign_url(book.page_1_image_url, book.id, "page_1")
+        page_2_presigned_url = await self._presign_url(book.page_2_image_url, book.id, "page_2")
+        page_3_presigned_url = await self._presign_url(book.page_3_image_url, book.id, "page_3")
+        page_4_presigned_url = await self._presign_url(book.page_4_image_url, book.id, "page_4")
 
         normalized_response_book_type = self._normalize_book_type_for_response(
             book_type=book_type,
@@ -1800,6 +1961,14 @@ class DigitalBookService:
             "front_image_presigned_url": front_presigned_url,
             "back_image_url": book.back_image_url,
             "back_image_presigned_url": back_presigned_url,
+            "page_1_image_url": book.page_1_image_url,
+            "page_1_image_presigned_url": page_1_presigned_url,
+            "page_2_image_url": book.page_2_image_url,
+            "page_2_image_presigned_url": page_2_presigned_url,
+            "page_3_image_url": book.page_3_image_url,
+            "page_3_image_presigned_url": page_3_presigned_url,
+            "page_4_image_url": book.page_4_image_url,
+            "page_4_image_presigned_url": page_4_presigned_url,
             "book_url": book.book_url if include_pdf_url else None,
             "total_pages": book.total_pages,
             "book_type_id": book.book_type_id,
@@ -1819,6 +1988,8 @@ class DigitalBookService:
             "title": book.book_name,
             "desc": book.description,
             "pages": book.total_pages,
+            "age": book.age_label or (getattr(book.age_group, "value", None) if book.age_group else None),
+            "age_group": book.age_label or (getattr(book.age_group, "value", None) if book.age_group else None),
             "rat": book.rating,
             "rev": book.total_ratings,
         }

@@ -205,11 +205,11 @@ export default function AdminPage() {
     description: "",
     category_id: "",
     emoji: "",
+    age_group: "",
     total_pages: "",
     genre: "fantasy",
     price: "",
     rating: "4.8",
-    total_ratings: "0",
     download_count: "0",
     is_bestseller: false,
     book_type: "digital story book",
@@ -220,6 +220,10 @@ export default function AdminPage() {
     cover_image: null,
     front_image: null,
     back_image: null,
+    page_1_image: null,
+    page_2_image: null,
+    page_3_image: null,
+    page_4_image: null,
     book_file: null,
   });
   const [bookAttributeOptions, setBookAttributeOptions] = useState({
@@ -475,18 +479,27 @@ export default function AdminPage() {
       description: "",
       category_id: "",
       emoji: "",
+      age_group: "",
       total_pages: "",
       genre: getDefaultOption("genre", "fantasy"),
       price: "",
       rating: "4.8",
-      total_ratings: "0",
       download_count: "0",
       is_bestseller: false,
       book_type: getDefaultOption("book_type", "digital story book"),
       theme: getDefaultOption("theme", "human"),
       language: getDefaultOption("language", "english"),
     });
-    setBookFiles({ cover_image: null, front_image: null, back_image: null, book_file: null });
+    setBookFiles({
+      cover_image: null,
+      front_image: null,
+      back_image: null,
+      page_1_image: null,
+      page_2_image: null,
+      page_3_image: null,
+      page_4_image: null,
+      book_file: null,
+    });
     setBookModalOpen(true);
   }
 
@@ -499,18 +512,27 @@ export default function AdminPage() {
       description: b.description || b.desc || "",
       category_id: b.category_id ? String(b.category_id) : "",
       emoji: b.emoji || "",
+      age_group: b.age_group || b.age || "",
       total_pages: b.total_pages != null ? String(b.total_pages) : b.pages != null ? String(b.pages) : "",
       genre: b.genre_name || "fantasy",
       price: b.price != null ? String(b.price) : "",
       rating: b.rating != null ? String(b.rating) : b.rat != null ? String(b.rat) : "4.8",
-      total_ratings: b.total_ratings != null ? String(b.total_ratings) : b.rev != null ? String(b.rev) : "0",
       download_count: b.download_count != null ? String(b.download_count) : "0",
       is_bestseller: !!b.is_bestseller,
       book_type: b.book_type || "digital story book",
       theme: b.theme || "human",
       language: b.language || "english",
     });
-    setBookFiles({ cover_image: null, front_image: null, back_image: null, book_file: null });
+    setBookFiles({
+      cover_image: null,
+      front_image: null,
+      back_image: null,
+      page_1_image: null,
+      page_2_image: null,
+      page_3_image: null,
+      page_4_image: null,
+      book_file: null,
+    });
     setBookModalOpen(true);
   }
 
@@ -536,6 +558,7 @@ export default function AdminPage() {
         fd.append("description", bookForm.description || "");
         if (bookForm.category_id) fd.append("category_id", String(Number(bookForm.category_id)));
         fd.append("emoji", bookForm.emoji || "");
+        if (bookForm.age_group) fd.append("age_group", String(bookForm.age_group).trim());
         if (bookForm.total_pages) fd.append("total_pages", String(Number(bookForm.total_pages)));
         fd.append("book_type", bookForm.book_type);
         fd.append("theme", bookForm.theme);
@@ -543,35 +566,46 @@ export default function AdminPage() {
         fd.append("genre", bookForm.genre);
         if (bookForm.price) fd.append("price", String(Number(bookForm.price)));
         if (bookForm.rating) fd.append("rating", String(Number(bookForm.rating)));
-        if (bookForm.total_ratings) fd.append("total_ratings", String(Number(bookForm.total_ratings)));
         if (bookForm.download_count) fd.append("download_count", String(Number(bookForm.download_count)));
         fd.append("is_bestseller", String(!!bookForm.is_bestseller));
         fd.append("is_personalized", String(derivedIsPersonalized));
         fd.append("cover_image", bookFiles.cover_image);
         if (bookFiles.front_image) fd.append("front_image", bookFiles.front_image);
         if (bookFiles.back_image) fd.append("back_image", bookFiles.back_image);
+        if (bookFiles.page_1_image) fd.append("page_1_image", bookFiles.page_1_image);
+        if (bookFiles.page_2_image) fd.append("page_2_image", bookFiles.page_2_image);
+        if (bookFiles.page_3_image) fd.append("page_3_image", bookFiles.page_3_image);
+        if (bookFiles.page_4_image) fd.append("page_4_image", bookFiles.page_4_image);
         if (bookFiles.book_file) fd.append("book_file", bookFiles.book_file);
         await createDigitalBookAdmin(fd);
         setActionMsg("✅ Book added");
       } else {
-        const payload = {
-          book_name: bookForm.book_name || undefined,
-          description: bookForm.description,
-          category_id: bookForm.category_id ? Number(bookForm.category_id) : undefined,
-          emoji: bookForm.emoji || undefined,
-          total_pages: bookForm.total_pages ? Number(bookForm.total_pages) : undefined,
-          genre: bookForm.genre || undefined,
-          price: bookForm.price ? Number(bookForm.price) : undefined,
-          rating: bookForm.rating ? Number(bookForm.rating) : undefined,
-          total_ratings: bookForm.total_ratings ? Number(bookForm.total_ratings) : undefined,
-          download_count: bookForm.download_count ? Number(bookForm.download_count) : undefined,
-          is_bestseller: !!bookForm.is_bestseller,
-          is_personalized: derivedIsPersonalized,
-          book_type: bookForm.book_type,
-          theme: bookForm.theme,
-          language: bookForm.language,
-        };
-        await updateDigitalBookAdmin(bookEditingId, payload);
+        const fd = new FormData();
+        fd.append("book_name", bookForm.book_name || "");
+        fd.append("description", bookForm.description || "");
+        if (bookForm.category_id) fd.append("category_id", String(Number(bookForm.category_id)));
+        fd.append("emoji", bookForm.emoji || "");
+        if (bookForm.age_group) fd.append("age_group", String(bookForm.age_group).trim());
+        if (bookForm.total_pages) fd.append("total_pages", String(Number(bookForm.total_pages)));
+        fd.append("genre", bookForm.genre || "");
+        if (bookForm.price) fd.append("price", String(Number(bookForm.price)));
+        if (bookForm.rating) fd.append("rating", String(Number(bookForm.rating)));
+        if (bookForm.download_count) fd.append("download_count", String(Number(bookForm.download_count)));
+        fd.append("is_bestseller", String(!!bookForm.is_bestseller));
+        fd.append("is_personalized", String(derivedIsPersonalized));
+        fd.append("book_type", bookForm.book_type || "");
+        fd.append("theme", bookForm.theme || "");
+        fd.append("language", bookForm.language || "");
+        if (bookFiles.cover_image) fd.append("cover_image", bookFiles.cover_image);
+        if (bookFiles.front_image) fd.append("front_image", bookFiles.front_image);
+        if (bookFiles.back_image) fd.append("back_image", bookFiles.back_image);
+        if (bookFiles.page_1_image) fd.append("page_1_image", bookFiles.page_1_image);
+        if (bookFiles.page_2_image) fd.append("page_2_image", bookFiles.page_2_image);
+        if (bookFiles.page_3_image) fd.append("page_3_image", bookFiles.page_3_image);
+        if (bookFiles.page_4_image) fd.append("page_4_image", bookFiles.page_4_image);
+        if (bookFiles.book_file) fd.append("book_file", bookFiles.book_file);
+
+        await updateDigitalBookAdmin(bookEditingId, fd);
         setActionMsg("✅ Book updated");
       }
       setBookModalMsg("");
@@ -865,8 +899,8 @@ export default function AdminPage() {
                       {b.is_personalized ? <span style={{ background: "#E0ECFF", color: "#1d4ed8", fontSize: 11, borderRadius: 999, padding: "2px 8px", fontWeight: 700 }}>🧸 Personalized</span> : null}
                     </div>
                     <div style={{ fontSize: 13, color: "#546181" }}>ID: {b.id} | Category ID: {b.category_id || "—"}</div>
-                    <div style={{ fontSize: 13, color: "#546181" }}>Genre: {b.genre_name || "—"} | Pages: {b.total_pages || b.pages || "—"}</div>
-                    <div style={{ fontSize: 13, color: "#546181" }}>Price: ₹{b.price ?? "—"} | Rating: {b.rat ?? b.rating ?? "—"}</div>
+                    <div style={{ fontSize: 13, color: "#546181" }}>Genre: {b.genre_name || "—"} | Age: {b.age || b.age_group || "—"}</div>
+                    <div style={{ fontSize: 13, color: "#546181" }}>Price: ₹{b.price ?? "—"} | Rating: {b.rat ?? b.rating ?? "—"} | Bought: {b.download_count ?? 0}</div>
                     <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
                       <button type="button" style={{ ...button, background: "#EFE9FF", color: R, padding: "7px 14px", fontSize: 13 }} onClick={() => openEditBookModal(b)}>✏️ Edit</button>
                       <button type="button" style={{ ...button, background: "#FEE2E2", color: "#991B1B", padding: "7px 14px", fontSize: 13 }} onClick={() => deleteBook(b.id)}>🗑 Delete</button>
@@ -1238,11 +1272,11 @@ export default function AdminPage() {
                 <input style={inputStyle} placeholder="24" type="number" min="1" value={bookForm.total_pages} onChange={(e) => setBookForm((s) => ({ ...s, total_pages: e.target.value }))} />
               </div>
               <div style={{ display: "grid", gap: 6 }}>
-                <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Total Ratings</label>
-                <input style={inputStyle} placeholder="0" type="number" min="0" value={bookForm.total_ratings} onChange={(e) => setBookForm((s) => ({ ...s, total_ratings: e.target.value }))} />
+                <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Age Group</label>
+                <input style={inputStyle} placeholder="e.g. 9-10 or 5 or 6-15" value={bookForm.age_group} onChange={(e) => setBookForm((s) => ({ ...s, age_group: e.target.value }))} />
               </div>
               <div style={{ display: "grid", gap: 6 }}>
-                <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Download Count</label>
+                <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>People Bought</label>
                 <input style={inputStyle} placeholder="0" type="number" min="0" value={bookForm.download_count} onChange={(e) => setBookForm((s) => ({ ...s, download_count: e.target.value }))} />
               </div>
               <div style={{ display: "grid", gap: 6 }}>
@@ -1255,26 +1289,40 @@ export default function AdminPage() {
                 </label>
               </div>
             </div>
-            {bookMode === "add" ? (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, borderTop: "1px solid #EFE9FF", paddingTop: 10, marginTop: 4 }}>
-                <div style={{ display: "grid", gap: 6 }}>
-                  <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Cover Image <span style={{ color: "#b00020" }}>(required)</span></label>
-                  <input type="file" accept="image/*" style={inputStyle} onChange={(e) => setBookFiles((s) => ({ ...s, cover_image: e.target.files?.[0] || null }))} />
-                </div>
-                <div style={{ display: "grid", gap: 6 }}>
-                  <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Book PDF {isPersonalizedBookType(bookForm.book_type) ? <span style={{ color: "#2563EB" }}>(optional — generated per order)</span> : <span style={{ color: "#b00020" }}>(required)</span>}</label>
-                  <input type="file" accept="application/pdf" style={inputStyle} onChange={(e) => setBookFiles((s) => ({ ...s, book_file: e.target.files?.[0] || null }))} />
-                </div>
-                <div style={{ display: "grid", gap: 6 }}>
-                  <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Front Image <span style={{ color: "#2563EB" }}>(shown on card)</span></label>
-                  <input type="file" accept="image/*" style={inputStyle} onChange={(e) => setBookFiles((s) => ({ ...s, front_image: e.target.files?.[0] || null }))} />
-                </div>
-                <div style={{ display: "grid", gap: 6 }}>
-                  <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Back Image (optional)</label>
-                  <input type="file" accept="image/*" style={inputStyle} onChange={(e) => setBookFiles((s) => ({ ...s, back_image: e.target.files?.[0] || null }))} />
-                </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, borderTop: "1px solid #EFE9FF", paddingTop: 10, marginTop: 4 }}>
+              <div style={{ display: "grid", gap: 6 }}>
+                <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Cover Image {bookMode === "add" ? <span style={{ color: "#b00020" }}>(required)</span> : <span style={{ color: "#2563EB" }}>(optional replacement)</span>}</label>
+                <input type="file" accept="image/*" style={inputStyle} onChange={(e) => setBookFiles((s) => ({ ...s, cover_image: e.target.files?.[0] || null }))} />
               </div>
-            ) : null}
+              <div style={{ display: "grid", gap: 6 }}>
+                <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Book PDF {bookMode === "add" ? (isPersonalizedBookType(bookForm.book_type) ? <span style={{ color: "#2563EB" }}>(optional — generated per order)</span> : <span style={{ color: "#b00020" }}>(required)</span>) : <span style={{ color: "#2563EB" }}>(optional replacement)</span>}</label>
+                <input type="file" accept="application/pdf" style={inputStyle} onChange={(e) => setBookFiles((s) => ({ ...s, book_file: e.target.files?.[0] || null }))} />
+              </div>
+              <div style={{ display: "grid", gap: 6 }}>
+                <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Front Image <span style={{ color: "#2563EB" }}>(shown on card)</span></label>
+                <input type="file" accept="image/*" style={inputStyle} onChange={(e) => setBookFiles((s) => ({ ...s, front_image: e.target.files?.[0] || null }))} />
+              </div>
+              <div style={{ display: "grid", gap: 6 }}>
+                <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Back Image (optional)</label>
+                <input type="file" accept="image/*" style={inputStyle} onChange={(e) => setBookFiles((s) => ({ ...s, back_image: e.target.files?.[0] || null }))} />
+              </div>
+              <div style={{ display: "grid", gap: 6 }}>
+                <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Page 1 Image (optional)</label>
+                <input type="file" accept="image/*" style={inputStyle} onChange={(e) => setBookFiles((s) => ({ ...s, page_1_image: e.target.files?.[0] || null }))} />
+              </div>
+              <div style={{ display: "grid", gap: 6 }}>
+                <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Page 2 Image (optional)</label>
+                <input type="file" accept="image/*" style={inputStyle} onChange={(e) => setBookFiles((s) => ({ ...s, page_2_image: e.target.files?.[0] || null }))} />
+              </div>
+              <div style={{ display: "grid", gap: 6 }}>
+                <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Page 3 Image (optional)</label>
+                <input type="file" accept="image/*" style={inputStyle} onChange={(e) => setBookFiles((s) => ({ ...s, page_3_image: e.target.files?.[0] || null }))} />
+              </div>
+              <div style={{ display: "grid", gap: 6 }}>
+                <label style={{ fontWeight: 700, color: "#5b4f7c", fontSize: 13 }}>Page 4 Image (optional)</label>
+                <input type="file" accept="image/*" style={inputStyle} onChange={(e) => setBookFiles((s) => ({ ...s, page_4_image: e.target.files?.[0] || null }))} />
+              </div>
+            </div>
             {bookModalMsg ? (
               <p style={{ margin: 0, marginTop: 4, color: "#b00020", fontWeight: 700 }}>{bookModalMsg}</p>
             ) : null}

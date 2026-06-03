@@ -129,11 +129,13 @@ export type DigitalBook = {
   desc: string;
   price: number;
   age?: string;
+  age_group?: string | null;
   pages: number;
   style?: string;
   emoji: string;
   rat: number;
   rev: number;
+  download_count?: number;
   category_id?: number | null;
   category?: number | null;       // alias for category_id
   category_tag?: string | null;
@@ -148,6 +150,14 @@ export type DigitalBook = {
   front_image_presigned_url?: string | null;
   back_image_url?: string | null;
   back_image_presigned_url?: string | null;
+  page_1_image_url?: string | null;
+  page_1_image_presigned_url?: string | null;
+  page_2_image_url?: string | null;
+  page_2_image_presigned_url?: string | null;
+  page_3_image_url?: string | null;
+  page_3_image_presigned_url?: string | null;
+  page_4_image_url?: string | null;
+  page_4_image_presigned_url?: string | null;
 };
 
 export async function getDigitalBooks() {
@@ -537,27 +547,31 @@ export async function createDigitalBookAdmin(formData: FormData) {
 
 export async function updateDigitalBookAdmin(
   bookId: number,
-  input: Partial<{
-    book_name: string;
-    description: string | null;
-    category_id: number | null;
-    emoji: string | null;
-    total_pages: number | null;
-    book_type: string;
-    theme: string;
-    language: string;
-    genre: string;
-    price: number | null;
-    rating: number | null;
-    total_ratings: number | null;
-    download_count: number | null;
-    is_bestseller: boolean | null;
-    is_personalized?: boolean | null;
-  }>
+  input:
+    | Partial<{
+        book_name: string;
+        description: string | null;
+        category_id: number | null;
+        emoji: string | null;
+        age_group: string | null;
+        total_pages: number | null;
+        book_type: string;
+        theme: string;
+        language: string;
+        genre: string;
+        price: number | null;
+        rating: number | null;
+        total_ratings: number | null;
+        download_count: number | null;
+        is_bestseller: boolean | null;
+        is_personalized?: boolean | null;
+      }>
+    | FormData
 ) {
+  const body = input instanceof FormData ? input : JSON.stringify(input);
   return request<DigitalBook>(`/api/v1/digital-books/${bookId}`, {
     method: "PATCH",
-    body: JSON.stringify(input),
+    body,
   });
 }
 

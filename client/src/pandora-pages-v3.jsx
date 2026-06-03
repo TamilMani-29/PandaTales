@@ -603,14 +603,16 @@ export default function App(){
           <div style={{position:"absolute",bottom:-30,left:-20,width:90,height:90,borderRadius:"50%",background:"rgba(255,255,255,.12)"}}/>
           <div style={{position:"absolute",left:0,top:0,bottom:0,width:14,background:"linear-gradient(90deg,rgba(0,0,0,.2),transparent)",transform:"translateZ(-1px)"}}/>
           {!showFrontCover && <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:88,filter:"drop-shadow(0 8px 18px rgba(0,0,0,.25))",transform:`translateZ(50px) scale(${tilt.active?1.06:1})`,transition:"transform .4s"}}>{b.emoji}</div>}
-          <div style={{position:"absolute",top:12,left:12,background:"rgba(255,255,255,.95)",color:col.color,padding:"4px 10px",borderRadius:20,fontSize:".68rem",fontWeight:800,boxShadow:"0 4px 12px rgba(0,0,0,.15)",transform:"translateZ(40px)"}}>{b.style}</div>
           <div style={{position:"absolute",bottom:12,right:12,background:"#fff",color:col.color,padding:"6px 14px",borderRadius:30,fontFamily:"'Baloo 2',cursive",fontWeight:800,fontSize:"1.02rem",boxShadow:"0 6px 18px rgba(0,0,0,.2)",transform:"translateZ(50px)"}}>₹{b.price}</div>
-          <div style={{position:"absolute",top:12,right:12,background:`linear-gradient(135deg,${G},#FFC947)`,color:D,padding:"4px 10px",borderRadius:20,fontSize:".64rem",fontWeight:800,boxShadow:"0 4px 12px rgba(0,0,0,.18)",transform:"translateZ(45px)"}}>{getBookBadge(b,col)}</div>
+          {b.is_bestseller && <div style={{position:"absolute",top:12,right:12,background:"linear-gradient(135deg,#F39C12,#FFC947)",color:D,padding:"4px 10px",borderRadius:20,fontSize:".64rem",fontWeight:900,letterSpacing:.3,boxShadow:"0 4px 12px rgba(0,0,0,.18)",transform:"translateZ(45px)"}}>BEST SELLER</div>}
         </div>
         {/* Body */}
         <div style={{padding:"16px 18px 18px",transform:"translateZ(20px)",position:"relative",display:"flex",flexDirection:"column",minHeight:200}}>
           <h3 style={{fontFamily:"'Baloo 2',cursive",fontSize:"1.05rem",color:D,margin:"0 0 5px",lineHeight:1.25}}>{b.title}</h3>
-          <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:7}}><Stars r={b.rat}/><span style={{fontSize:".7rem",color:"#999",fontWeight:600}}>{b.rat} ({b.rev})</span></div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,marginBottom:7}}>
+            <div style={{display:"flex",alignItems:"center",gap:5}}><Stars r={b.rat}/><span style={{fontSize:".7rem",color:"#999",fontWeight:600}}>{b.rat}</span></div>
+            <span style={{fontSize:".7rem",color:"#999",fontWeight:700}}>{b.bought_count || 0} bought</span>
+          </div>
           <p style={{fontSize:".8rem",color:"#777",lineHeight:1.55,display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",overflow:"hidden",margin:"0 0 10px"}}>{b.desc}</p>
           <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:10}}>{[b.age,`${b.pages}${b.pages===1?" board":" pg"}`].map(t=><span key={t} style={{background:`${col.color}10`,color:col.color,padding:"3px 9px",borderRadius:10,fontSize:".68rem",fontWeight:700}}>{t}</span>)}</div>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",paddingTop:8,borderTop:`1px solid ${col.color}15`,marginTop:"auto"}}>
@@ -1030,15 +1032,18 @@ export default function App(){
         id:b.id,
         title:b.title,
         price:b.price,
-        age:b.age || "All ages",
+        age:b.age || b.age_group || "All ages",
+        age_group:b.age_group || b.age || null,
         pages:b.pages,
-        style:b.style || "Standard",
+        style:b.style || "",
         book_type:b.book_type || "",
         personalized_kind:b.personalized_kind || null,
+        is_bestseller:!!b.is_bestseller,
         is_personalized:!!b.is_personalized,
         emoji:b.emoji||"📘",
         rat:b.rat,
         rev:b.rev,
+        bought_count:Number(b.download_count || 0),
         desc:b.desc,
         category_id:b.category_id,
         cover_image_url:b.cover_image_url || null,
@@ -1047,6 +1052,14 @@ export default function App(){
         front_image_presigned_url:b.front_image_presigned_url || null,
         back_image_url:b.back_image_url || null,
         back_image_presigned_url:b.back_image_presigned_url || null,
+        page_1_image_url:b.page_1_image_url || null,
+        page_1_image_presigned_url:b.page_1_image_presigned_url || null,
+        page_2_image_url:b.page_2_image_url || null,
+        page_2_image_presigned_url:b.page_2_image_presigned_url || null,
+        page_3_image_url:b.page_3_image_url || null,
+        page_3_image_presigned_url:b.page_3_image_presigned_url || null,
+        page_4_image_url:b.page_4_image_url || null,
+        page_4_image_presigned_url:b.page_4_image_presigned_url || null,
       }));
     const bks=fromApi;
     return <div style={{background:C,minHeight:"100vh",paddingTop:70}}>
@@ -1204,32 +1217,94 @@ export default function App(){
   };
 
   const BookM=()=>{
-    if(!book) return null;
-    const b=book,c=b.collection;
-    const frontCover = getBookImageCandidates(b)[0] || null;
-    const backCover = b.back_image_presigned_url || b.back_image_url || null;
+    const [slideIndex,setSlideIndex]=useState(0);
+    const [candidateIndexByKey,setCandidateIndexByKey]=useState({});
+    const b=book;
+
+    useEffect(()=>{
+      setSlideIndex(0);
+      setCandidateIndexByKey({});
+    },[
+      book?.id,
+      book?.front_image_presigned_url,book?.front_image_url,
+      book?.back_image_presigned_url,book?.back_image_url,
+      book?.page_1_image_presigned_url,book?.page_1_image_url,
+      book?.page_2_image_presigned_url,book?.page_2_image_url,
+      book?.page_3_image_presigned_url,book?.page_3_image_url,
+      book?.page_4_image_presigned_url,book?.page_4_image_url,
+      book?.cover_image_presigned_url,book?.cover_image_url,
+    ]);
+
+    if(!b) return null;
+    const c=b.collection;
+    const slides=[
+      {key:"front",candidates:getImageCandidates(b.front_image_presigned_url,b.front_image_url,b.cover_image_presigned_url,b.cover_image_url)},
+      {key:"back",candidates:getImageCandidates(b.back_image_presigned_url,b.back_image_url,b.cover_image_presigned_url,b.cover_image_url,b.front_image_presigned_url,b.front_image_url)},
+      {key:"page_1",candidates:getImageCandidates(b.page_1_image_presigned_url,b.page_1_image_url)},
+      {key:"page_2",candidates:getImageCandidates(b.page_2_image_presigned_url,b.page_2_image_url)},
+      {key:"page_3",candidates:getImageCandidates(b.page_3_image_presigned_url,b.page_3_image_url)},
+      {key:"page_4",candidates:getImageCandidates(b.page_4_image_presigned_url,b.page_4_image_url)},
+    ].filter((slide)=>slide.candidates.length>0);
+    const totalSlides=slides.length;
+    const activeSlide=slides[slideIndex] || null;
+    const activeCandidateIndex = activeSlide ? (candidateIndexByKey[activeSlide.key] || 0) : 0;
+    const activeImage = activeSlide ? activeSlide.candidates[activeCandidateIndex] : null;
+
+    const nextSlide=()=>{ if(totalSlides>0) setSlideIndex((idx)=>(idx+1)%totalSlides); };
+    const prevSlide=()=>{ if(totalSlides>0) setSlideIndex((idx)=>(idx-1+totalSlides)%totalSlides); };
+
+    const onSlideImageError=()=>{
+      if(!activeSlide) return;
+      setCandidateIndexByKey((prev)=>{
+        const current=prev[activeSlide.key] || 0;
+        const next=Math.min(current+1,activeSlide.candidates.length);
+        if(next===current) return prev;
+        return {...prev,[activeSlide.key]:next};
+      });
+    };
+
     return <div onClick={()=>setBook(null)} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",backdropFilter:"blur(8px)",zIndex:1001,display:"flex",alignItems:"center",justifyContent:"center",padding:16,animation:"fadeIn .3s"}}>
       <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:24,maxWidth:540,width:"100%",maxHeight:"90vh",overflow:"auto",animation:"slideUp .4s cubic-bezier(.4,0,.2,1)"}}>
         <button onClick={()=>setBook(null)} style={{position:"sticky",top:12,float:"right",marginRight:12,width:32,height:32,borderRadius:"50%",border:"none",background:"rgba(0,0,0,.06)",cursor:"pointer",fontSize:16,zIndex:2}}>✕</button>
-        <div style={{padding:"18px 18px 0",display:"grid",gridTemplateColumns:backCover?"1fr 1fr":"1fr",gap:12}}>
-          <div style={{borderRadius:14,overflow:"hidden",background:`linear-gradient(135deg,${c.color}22,${c.color}55)`,height:180,display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
-            {frontCover ? (
-              <img src={frontCover} alt={`${b.title} front cover`} style={{width:"100%",height:"100%",objectFit:"cover"}} />
+        <div style={{padding:"18px 18px 0"}}>
+          <div style={{borderRadius:14,overflow:"hidden",background:`linear-gradient(135deg,${c.color}22,${c.color}55)`,height:220,display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
+            {activeImage ? (
+              <img src={activeImage} alt={`${b.title} preview`} onError={onSlideImageError} style={{width:"100%",height:"100%",objectFit:"cover"}} />
             ) : (
               <div style={{fontSize:62}}>{b.emoji}</div>
             )}
-            <div style={{position:"absolute",left:10,bottom:10,background:"rgba(255,255,255,.92)",padding:"3px 10px",borderRadius:20,fontSize:".68rem",fontWeight:800,color:D}}>Front Cover</div>
+            {totalSlides>1 ? (
+              <>
+                <button type="button" onClick={prevSlide} style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",width:34,height:34,borderRadius:"50%",border:"none",background:"rgba(255,255,255,.92)",color:D,fontSize:18,fontWeight:800,cursor:"pointer"}}>‹</button>
+                <button type="button" onClick={nextSlide} style={{position:"absolute",right:10,top:"50%",transform:"translateY(-50%)",width:34,height:34,borderRadius:"50%",border:"none",background:"rgba(255,255,255,.92)",color:D,fontSize:18,fontWeight:800,cursor:"pointer"}}>›</button>
+              </>
+            ) : null}
           </div>
-          {backCover && (
-            <div style={{borderRadius:14,overflow:"hidden",background:`linear-gradient(135deg,${c.color}22,${c.color}55)`,height:180,display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
-              <img src={backCover} alt={`${b.title} back cover`} style={{width:"100%",height:"100%",objectFit:"cover"}} />
-              <div style={{position:"absolute",left:10,bottom:10,background:"rgba(255,255,255,.92)",padding:"3px 10px",borderRadius:20,fontSize:".68rem",fontWeight:800,color:D}}>Back Cover</div>
+          {totalSlides>1 ? (
+            <div style={{display:"flex",justifyContent:"center",gap:6,paddingTop:10}}>
+              {slides.map((slide,idx)=>(
+                <button
+                  key={slide.key}
+                  type="button"
+                  onClick={()=>setSlideIndex(idx)}
+                  aria-label={`Go to image ${idx+1}`}
+                  style={{
+                    width: idx===slideIndex ? 18 : 8,
+                    height: 8,
+                    borderRadius: 999,
+                    border: "none",
+                    background: idx===slideIndex ? c.color : `${c.color}55`,
+                    cursor: "pointer",
+                    transition: "all .25s ease",
+                  }}
+                />
+              ))}
             </div>
-          )}
+          ) : null}
         </div>
         <div style={{padding:"22px 26px 28px"}}>
           <h2 style={{fontFamily:"'Baloo 2',cursive",fontSize:"1.4rem",color:D,margin:"0 0 4px"}}>{b.title}</h2>
-          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:12}}><Stars r={b.rat}/><span style={{fontSize:".85rem",fontWeight:700,color:"#444"}}>{b.rat}</span><span style={{fontSize:".8rem",color:"#aaa"}}>({b.rev} reviews)</span></div>
+          <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:12}}><Stars r={b.rat}/><span style={{fontSize:".85rem",fontWeight:700,color:"#444"}}>{b.rat}</span></div>
           <p style={{fontSize:".92rem",color:"#666",lineHeight:1.7,marginBottom:20}}>{b.desc}</p>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:22}}>
             {[["Collection",c.name,c.emoji],["Style",b.style || "Standard","🎨"],["Age",b.age || "All ages","👶"],["Pages",`${b.pages}${b.pages===1?" board":" pg"}`,"📄"]].map(([l,v,ic])=><div key={l} style={{background:"#F8F5FF",borderRadius:12,padding:"10px 14px",display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:18}}>{ic}</span><div><div style={{fontSize:".68rem",color:"#bbb",fontWeight:600,textTransform:"uppercase"}}>{l}</div><div style={{fontSize:".85rem",fontWeight:700,color:"#333"}}>{v}</div></div></div>)}
