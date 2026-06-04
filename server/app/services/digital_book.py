@@ -756,7 +756,7 @@ class DigitalBookService:
         if data.book_type is not None:
             normalized_book_type = self._normalize_book_type_value(data.book_type)
             book.book_type_id = await self._normalize_and_validate_attribute_option("book_type", normalized_book_type)
-        if data.theme is not None:
+        if data.style is not None:
             book.theme_id = await self._normalize_and_validate_attribute_option("style", data.style)
         if data.language is not None:
             book.language_id = await self._normalize_and_validate_attribute_option("language", data.language)

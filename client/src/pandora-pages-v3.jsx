@@ -586,13 +586,13 @@ export default function App(){
     return <div onClick={onClick} onMouseMove={onMove} onMouseLeave={onLeave} style={{position:"relative",cursor:"pointer",perspective:1400,minHeight:430}}>
       <div style={{position:"relative",width:"100%",height:"auto",minHeight:"100%",borderRadius:22,transformStyle:"preserve-3d",transform:`rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,transition:tilt.active?"transform .08s linear":"transform .55s cubic-bezier(.2,.9,.3,1.2)",background:"#fff",boxShadow:tilt.active?`0 32px 70px -18px ${col.color}55, 0 18px 40px -20px rgba(0,0,0,.25)`:`0 10px 30px -8px ${col.color}22, 0 4px 12px rgba(0,0,0,.06)`,overflow:"hidden",border:`1px solid ${col.color}22`}}>
         {/* Cover */}
-        <div style={{position:"relative",height:230,background:col.grad,overflow:"hidden",transform:"translateZ(0)"}}>
+        <div style={{position:"relative",width:"100%",aspectRatio:"1 / 1",background:col.grad,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",transform:"translateZ(0)"}}>
           {showFrontCover && (
             <img
               src={frontCover}
               alt={`${b.title} front cover`}
               onError={()=>setCoverIndex((idx)=>Math.min(idx+1,coverCandidates.length))}
-              style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover"}}
+              style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",objectPosition:"center"}}
             />
           )}
           {showFrontCover && (
@@ -1267,9 +1267,9 @@ export default function App(){
       <div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:24,maxWidth:540,width:"100%",maxHeight:"90vh",overflow:"auto",animation:"slideUp .4s cubic-bezier(.4,0,.2,1)"}}>
         <button onClick={()=>setBook(null)} style={{position:"sticky",top:12,float:"right",marginRight:12,width:32,height:32,borderRadius:"50%",border:"none",background:"rgba(0,0,0,.06)",cursor:"pointer",fontSize:16,zIndex:2}}>✕</button>
         <div style={{padding:"18px 18px 0"}}>
-          <div style={{borderRadius:14,overflow:"hidden",background:`linear-gradient(135deg,${c.color}22,${c.color}55)`,height:220,display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
+          <div style={{borderRadius:14,overflow:"hidden",background:`linear-gradient(135deg,${c.color}22,${c.color}55)`,width:"100%",aspectRatio:"1 / 1",display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
             {activeImage ? (
-              <img src={activeImage} alt={`${b.title} preview`} onError={onSlideImageError} style={{width:"100%",height:"100%",objectFit:"cover"}} />
+              <img src={activeImage} alt={`${b.title} preview`} onError={onSlideImageError} style={{width:"100%",height:"100%",objectFit:"cover",objectPosition:"center"}} />
             ) : (
               <div style={{fontSize:62}}>{b.emoji}</div>
             )}

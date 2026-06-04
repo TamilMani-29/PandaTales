@@ -556,7 +556,7 @@ export async function updateDigitalBookAdmin(
         age_group: string | null;
         total_pages: number | null;
         book_type: string;
-        theme: string;
+        style: string;
         language: string;
         genre: string;
         price: number | null;
