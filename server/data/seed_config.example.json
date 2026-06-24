@@ -1,0 +1,14 @@
+{
+  "database": {
+    "url": "postgresql+asyncpg://your_username:your_password@localhost:5432/your_database",
+    "echo": false
+  },
+  "data_files": {
+    "story_book_templates": "data/story_book_templates.json"
+  },
+  "options": {
+    "skip_duplicates": true,
+    "update_existing": false,
+    "validate_schema": true
+  }
+}
