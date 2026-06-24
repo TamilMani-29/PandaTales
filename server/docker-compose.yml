@@ -68,12 +68,14 @@ services:
       # Database
       DATABASE_URL: postgresql+asyncpg://pandatales:pandatales_dev_password@postgres:5432/pandatales
       
-      # MinIO
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin123
-      MINIO_BUCKET: pandatales
-      MINIO_USE_SSL: "false"
+      # Cloudflare R2
+      STORAGE_PROVIDER: r2
+      R2_ENDPOINT: ${R2_ENDPOINT:-}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_BUCKET: ${R2_BUCKET:-pandatales}
+      R2_SECURE: ${R2_SECURE:-true}
+      R2_REGION: ${R2_REGION:-auto}
       
       # JWT
       JWT_SECRET_KEY: dev_jwt_secret_key_change_in_production

@@ -45,6 +45,11 @@ from app.schemas.digital_book import (
     DigitalBookUpdateRequest,
 )
 from app.services.storage import StorageService
+from app.utils.pdf_storage import (
+    compress_pdf_for_storage,
+    maybe_decompress_pdf,
+    to_pdf_storage_object_name,
+)
 
 logger = get_logger(__name__)
 
@@ -131,7 +136,7 @@ class DigitalBookService:
         page_4_image=None,
         book_file=None,
     ) -> Book:
-        """Create digital book, upload files to MinIO, and persist object paths."""
+        """Create digital book, upload files to R2, and persist object paths."""
         if not cover_image.content_type or not cover_image.content_type.startswith("image/"):
             raise BadRequestException("cover_image must be an image file")
 
@@ -223,7 +228,7 @@ class DigitalBookService:
                     continue
                 page_ext = Path(page_file.filename or "").suffix.lower() or ".jpg"
                 page_object_names[f"page_{idx}_image_url"] = f"digital-books/page_images/{slug}-{book.id}-page-{idx}{page_ext}"
-            book_object_name = f"digital-books/books/{slug}-{book.id}.pdf"
+            book_object_name = to_pdf_storage_object_name(f"digital-books/books/{slug}-{book.id}.pdf")
 
             await self.storage.upload_file(
                 file=cover_image,
@@ -265,10 +270,12 @@ class DigitalBookService:
                 uploaded_objects.append(object_name)
 
             if book_file is not None:
+                book_file_bytes = await book_file.read()
+                compressed_pdf_bytes = compress_pdf_for_storage(book_file_bytes)
                 await self.storage.upload_file(
-                    file=book_file,
+                    file=io.BytesIO(compressed_pdf_bytes),
                     object_name=book_object_name,
-                    content_type="application/pdf",
+                    content_type="application/gzip",
                     max_size_mb=6144,
                 )
                 uploaded_objects.append(book_object_name)
@@ -383,11 +390,15 @@ class DigitalBookService:
                 setattr(book, field_name, object_name)
 
             if book_file is not None:
-                pdf_object_name = f"digital-books/books/{slug}-{book.id}-{uuid4().hex[:8]}.pdf"
+                book_file_bytes = await book_file.read()
+                compressed_pdf_bytes = compress_pdf_for_storage(book_file_bytes)
+                pdf_object_name = to_pdf_storage_object_name(
+                    f"digital-books/books/{slug}-{book.id}-{uuid4().hex[:8]}.pdf"
+                )
                 await self.storage.upload_file(
-                    file=book_file,
+                    file=io.BytesIO(compressed_pdf_bytes),
                     object_name=pdf_object_name,
-                    content_type="application/pdf",
+                    content_type="application/gzip",
                     max_size_mb=6144,
                 )
                 uploaded_objects.append(pdf_object_name)
@@ -845,7 +856,7 @@ class DigitalBookService:
         return await self._to_response_dict(book, genre_name=None, include_pdf_url=False)
 
     async def delete_book(self, book_id: int) -> dict:
-        """Delete a digital book record. MinIO assets are not removed."""
+        """Delete a digital book record. R2 assets are not removed."""
         book = await self.db.get(Book, book_id)
         if not book:
             raise NotFoundException("Book not found")
@@ -1111,10 +1122,6 @@ class DigitalBookService:
             "user_id": order.user_id,
             "book_id": order.book_id,
             "amount": order.amount,
-            "taxable_amount": taxable_amount_paise,
-            "gst_rate_percent": gst_rate_percent,
-            "gst_amount": gst_amount_paise,
-            "total_amount": total_amount_paise,
             "currency": order.currency,
             "key_id": self._key_id,
             "razorpay_order_id": order.razorpay_order_id,
@@ -1255,7 +1262,8 @@ class DigitalBookService:
 
         safe_book_name = slugify(book.book_name) or f"book-{book.id}"
 
-        pdf_bytes = await self.storage.download_file(book.book_url)
+        compressed_pdf_bytes = await self.storage.download_file(book.book_url)
+        pdf_bytes = maybe_decompress_pdf(compressed_pdf_bytes, object_name=book.book_url)
         pdf_filename = f"{safe_book_name}-{order.id}.pdf"
         pdf_path = order_dir / pdf_filename
         await asyncio.to_thread(pdf_path.write_bytes, pdf_bytes)
@@ -1323,16 +1331,8 @@ class DigitalBookService:
             "line_items": [
                 {
                     "name": book.book_name,
-                    "description": "Digital book (taxable amount)",
-                    "amount": taxable_amount_paise,
-                    "currency": "INR",
-                    "quantity": 1,
-                    "hsn_code": "99843",
-                },
-                {
-                    "name": f"GST @{gst_rate_percent}%",
-                    "description": "GST component",
-                    "amount": gst_amount_paise,
+                    "description": "Digital book",
+                    "amount": order.amount,
                     "currency": "INR",
                     "quantity": 1,
                     "hsn_code": "99843",
@@ -1343,16 +1343,11 @@ class DigitalBookService:
             "notes": {
                 "order_id": str(order.id),
                 "payment_id": order.razorpay_payment_id or "",
-                "seller_gstin": settings.SELLER_GSTIN,
                 "customer_name": customer_name,
                 "customer_email": user.email,
                 "customer_contact": customer_contact,
                 "hsn_sac": "99843",
-                "taxable_amount_inr": f"{taxable_amount_paise / 100:.2f}",
-                "gst_rate_percent": str(gst_rate_percent),
-                "igst_inr": f"{igst_amount_paise / 100:.2f}",
-                "cgst_inr": f"{cgst_amount_paise / 100:.2f}",
-                "sgst_inr": f"{sgst_amount_paise / 100:.2f}",
+                "total_amount_inr": f"{order.amount / 100:.2f}",
             },
         }
 
@@ -1365,9 +1360,6 @@ class DigitalBookService:
                 user=user,
                 book=book,
                 invoice_number=invoice_number,
-                taxable_amount_paise=taxable_amount_paise,
-                gst_rate_percent=gst_rate_percent,
-                gst_amount_paise=gst_amount_paise,
             )
             return {
                 "invoice_email_sent": smtp_sent,
@@ -1399,9 +1391,6 @@ class DigitalBookService:
                     user=user,
                     book=book,
                     invoice_number=invoice_number,
-                    taxable_amount_paise=taxable_amount_paise,
-                    gst_rate_percent=gst_rate_percent,
-                    gst_amount_paise=gst_amount_paise,
                 )
             except Exception as exc:
                 logger.warning(
@@ -1441,9 +1430,6 @@ class DigitalBookService:
                     user=user,
                     book=book,
                     invoice_number=invoice_number,
-                    taxable_amount_paise=taxable_amount_paise,
-                    gst_rate_percent=gst_rate_percent,
-                    gst_amount_paise=gst_amount_paise,
                 )
             except Exception as email_exc:
                 logger.warning(
@@ -1473,9 +1459,6 @@ class DigitalBookService:
         user: User,
         book: Book,
         invoice_number: str,
-        taxable_amount_paise: int,
-        gst_rate_percent: int,
-        gst_amount_paise: int,
     ) -> bool:
         if not settings.SMTP_HOST or not settings.SMTP_PORT:
             return False
@@ -1487,11 +1470,6 @@ class DigitalBookService:
         total_amount_paise = order.amount
         customer_name = (user.full_name or user.first_name or "Customer").strip() or "Customer"
         customer_phone = (user.phone or "").strip() or "Unavailable"
-        igst_amount_paise, cgst_amount_paise, sgst_amount_paise = self._split_gst_components(
-            gst_amount_paise,
-            is_intra_state=self._is_intra_state_supply(),
-        )
-
         invoice_pdf = self._build_digital_invoice_pdf_bytes(
             invoice_number=invoice_number,
             order=order,
@@ -1499,35 +1477,23 @@ class DigitalBookService:
             customer_name=customer_name,
             customer_email=user.email,
             customer_phone=customer_phone,
-            taxable_amount_paise=taxable_amount_paise,
-            gst_rate_percent=gst_rate_percent,
-            gst_amount_paise=gst_amount_paise,
-            igst_amount_paise=igst_amount_paise,
-            cgst_amount_paise=cgst_amount_paise,
-            sgst_amount_paise=sgst_amount_paise,
             total_amount_paise=total_amount_paise,
         )
 
         message = EmailMessage()
-        message["Subject"] = f"GST Invoice for digital order #{order.id} - Panda Tales"
+        message["Subject"] = f"Invoice for digital order #{order.id} - Panda Tales"
         message["From"] = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_FROM_EMAIL}>"
         message["To"] = user.email
         message.set_content(
             f"Hi {customer_name},\n\n"
             "Thanks for your digital purchase with Panda Tales.\n"
-            "Please find your GST invoice attached.\n\n"
+            "Please find your invoice attached.\n\n"
             f"Invoice Number: {invoice_number}\n"
             f"Customer Name: {customer_name}\n"
             f"Customer Email: {user.email}\n"
             f"Customer Phone: {customer_phone}\n"
             f"Book: {book.book_name}\n"
-            "HSN/SAC: 99843\n"
-            f"Taxable Amount: INR {taxable_amount_paise / 100:.2f}\n"
-            f"GST ({gst_rate_percent}%): INR {gst_amount_paise / 100:.2f}\n"
-            f"IGST: INR {igst_amount_paise / 100:.2f}\n"
-            f"CGST: INR {cgst_amount_paise / 100:.2f}\n"
-            f"SGST: INR {sgst_amount_paise / 100:.2f}\n"
-            f"Grand Total: INR {total_amount_paise / 100:.2f}\n\n"
+            f"Amount Paid: INR {total_amount_paise / 100:.2f}\n\n"
             "Regards,\n"
             "Panda Tales"
         )
@@ -1557,12 +1523,6 @@ class DigitalBookService:
         customer_name: str,
         customer_email: str,
         customer_phone: str,
-        taxable_amount_paise: int,
-        gst_rate_percent: int,
-        gst_amount_paise: int,
-        igst_amount_paise: int,
-        cgst_amount_paise: int,
-        sgst_amount_paise: int,
         total_amount_paise: int,
     ) -> bytes:
         buffer = io.BytesIO()
@@ -1574,7 +1534,7 @@ class DigitalBookService:
         y = page_h - 50
 
         pdf.setFont("Helvetica-Bold", 20)
-        pdf.drawString(left, y, "TAX INVOICE")
+        pdf.drawString(left, y, "INVOICE")
         pdf.setFont("Helvetica", 9)
         pdf.drawString(left, y - 14, "Panda Tales")
 
@@ -1609,7 +1569,6 @@ class DigitalBookService:
         pdf.drawString(left + 8, y - 58, customer_phone)
 
         pdf.drawString(left + half_w + gap + 8, y - 30, settings.SMTP_FROM_NAME)
-        pdf.drawString(left + half_w + gap + 8, y - 44, f"GSTIN: {settings.SELLER_GSTIN}")
         pdf.drawString(left + half_w + gap + 8, y - 58, "Country: India")
 
         y -= box_h + 20
@@ -1618,7 +1577,7 @@ class DigitalBookService:
         row_h = 20
         table_rows = 2
         table_h = row_h * table_rows
-        col_widths = [26, 184, 66, 80, 44, 70, 76]
+        col_widths = [26, 260, 96, 108]
         table_w = sum(col_widths)
 
         pdf.rect(left, table_top - table_h, table_w, table_h)
@@ -1632,11 +1591,11 @@ class DigitalBookService:
         pdf.rect(left, table_top - row_h, table_w, row_h, fill=1, stroke=0)
         pdf.setFillColor(Color(0, 0, 0))
 
-        headers = ["#", "Description", "HSN/SAC", "Taxable", "GST %", "GST Amt", "Total"]
+        headers = ["#", "Description", "HSN/SAC", "Amount"]
         x = left
         pdf.setFont("Helvetica-Bold", 9)
         for idx, title in enumerate(headers):
-            align_right = idx in (3, 5, 6)
+            align_right = idx in (3,)
             if align_right:
                 pdf.drawRightString(x + col_widths[idx] - 4, table_top - 14, title)
             else:
@@ -1647,15 +1606,12 @@ class DigitalBookService:
             "1",
             f"{book.book_name} (Digital)",
             "99843",
-            f"INR {taxable_amount_paise / 100:.2f}",
-            f"{gst_rate_percent}%",
-            f"INR {gst_amount_paise / 100:.2f}",
             f"INR {total_amount_paise / 100:.2f}",
         ]
         x = left
         pdf.setFont("Helvetica", 9)
         for idx, value in enumerate(values):
-            align_right = idx in (3, 5, 6)
+            align_right = idx in (3,)
             if align_right:
                 pdf.drawRightString(x + col_widths[idx] - 4, table_top - row_h - 14, value)
             else:
@@ -1665,21 +1621,12 @@ class DigitalBookService:
         y = table_top - table_h - 16
 
         summary_w = 230
-        summary_h = 92
+        summary_h = 40
         summary_x = right - summary_w
         pdf.rect(summary_x, y - summary_h, summary_w, summary_h)
         pdf.setFont("Helvetica-Bold", 10)
-        pdf.drawString(summary_x + 8, y - 14, "Tax Summary")
-        pdf.setFont("Helvetica", 9)
-        pdf.drawString(summary_x + 8, y - 30, f"IGST: INR {igst_amount_paise / 100:.2f}")
-        pdf.drawString(summary_x + 8, y - 44, f"CGST: INR {cgst_amount_paise / 100:.2f}")
-        pdf.drawString(summary_x + 8, y - 58, f"SGST: INR {sgst_amount_paise / 100:.2f}")
-        pdf.setFont("Helvetica-Bold", 10)
-        pdf.drawString(summary_x + 8, y - 78, "Grand Total")
-        pdf.drawRightString(summary_x + summary_w - 8, y - 78, f"INR {total_amount_paise / 100:.2f}")
-
-        pdf.setFont("Helvetica", 8)
-        pdf.drawString(left, y - summary_h - 14, "GST summary: Digital products 5%.")
+        pdf.drawString(summary_x + 8, y - 24, "Total")
+        pdf.drawRightString(summary_x + summary_w - 8, y - 24, f"INR {total_amount_paise / 100:.2f}")
 
         pdf.showPage()
         pdf.save()
@@ -1726,10 +1673,6 @@ class DigitalBookService:
             "book_id": order.book_id,
             "book_name": book.book_name if book else "Unknown",
             "amount": order.amount,
-            "taxable_amount": taxable_amount_paise,
-            "gst_rate_percent": gst_rate_percent,
-            "gst_amount": gst_amount_paise,
-            "total_amount": order.amount,
             "currency": order.currency,
             "payment_status": order.payment_status,
             "status": order.status,
@@ -1752,7 +1695,8 @@ class DigitalBookService:
         if not book.book_url:
             raise BadRequestException("Book PDF URL is missing")
 
-        original_pdf = await self.storage.download_file(book.book_url)
+        original_pdf_blob = await self.storage.download_file(book.book_url)
+        original_pdf = maybe_decompress_pdf(original_pdf_blob, object_name=book.book_url)
         watermarked_pdf = await asyncio.to_thread(
             self._generate_watermarked_pdf_sync,
             original_pdf,
@@ -2092,7 +2036,7 @@ class DigitalBookService:
             return raw
 
         # Always serve through API proxy so browser access is stable across
-        # environments even when direct MinIO/public URLs are misconfigured.
+        # environments even when direct storage/public URLs are misconfigured.
         object_path = raw.lstrip("/")
         return f"/api/v1/digital-books/images/{object_path}"
 
@@ -2109,7 +2053,7 @@ class DigitalBookService:
             return raw
 
         # Always serve through API proxy so browser access is stable across
-        # environments even when direct MinIO/public URLs are misconfigured.
+        # environments even when direct storage/public URLs are misconfigured.
         object_path = raw.lstrip("/")
         return f"/api/v1/digital-books/images/{object_path}"
 

@@ -9,7 +9,7 @@ AI-Powered Children's Coloring Book Generation Platform - Backend API built with
 - **Database**: PostgreSQL 15+ with asyncpg
 - **ORM**: SQLAlchemy 2.0 (async)
 - **Migrations**: Alembic
-- **File Storage**: MinIO (S3-compatible)
+- **File Storage**: Cloudflare R2 (S3-compatible)
 - **Task Queue**: Celery
 - **Logging**: Structlog
 - **Validation**: Pydantic 2.5+
@@ -39,7 +39,7 @@ app/
 - uv (Python package manager)
 - Docker & Docker Compose (for local development)
 - PostgreSQL 15+ (if not using Docker)
-- MinIO (if not using Docker)
+- Cloudflare R2 bucket and API credentials
 
 ## Setup
 
@@ -81,14 +81,14 @@ cp .env.example .env
 # Edit .env with your configuration
 # At minimum, configure:
 # - DATABASE_URL
-# - MINIO settings
+# - R2 settings
 # - JWT_SECRET_KEY
 ```
 
 ### 4. Run with Docker (Recommended for Development)
 
 ```bash
-# Start all services (PostgreSQL, MinIO, FastAPI)
+# Start all services (PostgreSQL, FastAPI)
 docker-compose up -d
 
 # Check logs
@@ -106,12 +106,11 @@ The API will be available at `http://localhost:8000`.
 Services:
 - **API**: http://localhost:8000
 - **API Docs**: http://localhost:8000/docs
-- **MinIO Console**: http://localhost:9001 (minioadmin/minioadmin123)
 - **PostgreSQL**: localhost:5432
 
 ### 5. Run Locally (Without Docker)
 
-Ensure PostgreSQL and MinIO are running separately.
+Ensure PostgreSQL is running and R2 credentials are configured.
 
 ```bash
 # Run database migrations
@@ -264,9 +263,10 @@ See `.env.example` for all available configuration options.
 
 Key variables:
 - `DATABASE_URL`: PostgreSQL connection string
-- `MINIO_ENDPOINT`: MinIO server endpoint
-- `MINIO_ACCESS_KEY`: MinIO access key
-- `MINIO_SECRET_KEY`: MinIO secret key
+- `R2_ENDPOINT`: Cloudflare R2 endpoint
+- `R2_ACCESS_KEY_ID`: Cloudflare R2 access key ID
+- `R2_SECRET_ACCESS_KEY`: Cloudflare R2 secret access key
+- `R2_BUCKET`: Cloudflare R2 bucket name
 - `JWT_SECRET_KEY`: Secret key for JWT tokens
 - `OPENAI_API_KEY`: OpenAI API key for story generation
 - `STRIPE_SECRET_KEY`: Stripe secret key for payments
@@ -286,15 +286,12 @@ docker-compose logs postgres
 docker-compose exec postgres psql -U pandatales -d pandatales
 ```
 
-### MinIO Issues
+### R2 Storage Issues
 
 ```bash
-# Check MinIO status
-docker-compose ps minio
-
-# Access MinIO console
-Open http://localhost:9001 in browser
-Login with minioadmin/minioadmin123
+# Validate endpoint and credentials
+echo $R2_ENDPOINT
+echo $R2_BUCKET
 ```
 
 ### Reset Everything

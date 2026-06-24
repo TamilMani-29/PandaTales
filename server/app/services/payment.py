@@ -123,10 +123,6 @@ class PaymentService:
             order_id=order.id,
             razorpay_order_id=rz_order["id"],
             amount=total_amount,
-            taxable_amount=amount,
-            gst_rate_percent=gst_rate_percent,
-            gst_amount=gst_amount,
-            total_amount=total_amount,
             currency="INR",
             key_id=self._key_id,
         )
@@ -257,10 +253,6 @@ class PaymentService:
             book_id=order.book_id,
             format=order.format,
             amount=order.amount,
-            taxable_amount=taxable_amount,
-            gst_rate_percent=gst_rate_percent,
-            gst_amount=gst_amount,
-            total_amount=order.amount,
             currency=order.currency,
             razorpay_order_id=order.razorpay_order_id,
             razorpay_payment_id=order.razorpay_payment_id,
@@ -308,12 +300,6 @@ class PaymentService:
             customer_name=user.full_name or user.first_name,
             customer_email=user.email,
             customer_phone=phone,
-            taxable_amount_paise=taxable_amount,
-            gst_rate_percent=gst_rate_percent,
-            gst_amount_paise=gst_amount,
-            igst_amount_paise=igst_amount,
-            cgst_amount_paise=cgst_amount,
-            sgst_amount_paise=sgst_amount,
             hsn_sac_code=hsn_sac_code,
             total_amount_paise=order.amount,
         )
@@ -325,18 +311,12 @@ class PaymentService:
         message.set_content(
             f"Hi {user.full_name or user.first_name or 'Customer'},\n\n"
             "Thanks for your order with Panda Tales.\n"
-            "Please find your GST invoice attached.\n\n"
+            "Please find your invoice attached.\n\n"
             f"Invoice Number: {invoice_number}\n"
             f"Customer Name: {user.full_name or user.first_name or 'Customer'}\n"
             f"Customer Email: {user.email}\n"
             f"Customer Phone: {phone or 'Unavailable'}\n"
-            f"HSN/SAC: {hsn_sac_code}\n"
-            f"Taxable Amount: INR {taxable_amount / 100:.2f}\n"
-            f"GST ({gst_rate_percent}%): INR {gst_amount / 100:.2f}\n"
-            f"IGST: INR {igst_amount / 100:.2f}\n"
-            f"CGST: INR {cgst_amount / 100:.2f}\n"
-            f"SGST: INR {sgst_amount / 100:.2f}\n"
-            f"Grand Total: INR {order.amount / 100:.2f}\n\n"
+            f"Amount Paid: INR {order.amount / 100:.2f}\n\n"
             "Regards,\n"
             "Panda Tales"
         )
@@ -396,16 +376,8 @@ class PaymentService:
             "line_items": [
                 {
                     "name": f"{order.format.title()} book purchase",
-                    "description": "Taxable amount",
-                    "amount": taxable_amount,
-                    "currency": "INR",
-                    "quantity": 1,
-                    "hsn_code": hsn_sac_code,
-                },
-                {
-                    "name": f"GST @{gst_rate_percent}%",
-                    "description": "GST component",
-                    "amount": gst_amount,
+                    "description": "Final amount",
+                    "amount": order.amount,
                     "currency": "INR",
                     "quantity": 1,
                     "hsn_code": hsn_sac_code,
@@ -416,17 +388,10 @@ class PaymentService:
             "notes": {
                 "order_id": str(order.id),
                 "payment_id": order.razorpay_payment_id or "",
-                "seller_gstin": get_settings().SELLER_GSTIN,
                 "customer_name": user.full_name or user.first_name or "Customer",
                 "customer_email": user.email,
                 "customer_phone": user.phone or "",
                 "hsn_sac": hsn_sac_code,
-                "taxable_amount_inr": f"{taxable_amount / 100:.2f}",
-                "gst_rate_percent": str(gst_rate_percent),
-                "gst_amount_inr": f"{gst_amount / 100:.2f}",
-                "igst_inr": f"{igst_amount / 100:.2f}",
-                "cgst_inr": f"{cgst_amount / 100:.2f}",
-                "sgst_inr": f"{sgst_amount / 100:.2f}",
                 "total_amount_inr": f"{order.amount / 100:.2f}",
             },
         }
@@ -491,12 +456,6 @@ class PaymentService:
         customer_name: str,
         customer_email: str,
         customer_phone: str,
-        taxable_amount_paise: int,
-        gst_rate_percent: int,
-        gst_amount_paise: int,
-        igst_amount_paise: int,
-        cgst_amount_paise: int,
-        sgst_amount_paise: int,
         hsn_sac_code: str,
         total_amount_paise: int,
     ) -> bytes:
@@ -510,7 +469,7 @@ class PaymentService:
         y = page_h - 50
 
         pdf.setFont("Helvetica-Bold", 20)
-        pdf.drawString(left, y, "TAX INVOICE")
+        pdf.drawString(left, y, "INVOICE")
         pdf.setFont("Helvetica", 9)
         pdf.drawString(left, y - 14, "Panda Tales")
 
@@ -545,7 +504,6 @@ class PaymentService:
         pdf.drawString(left + 8, y - 58, customer_phone or "Unavailable")
 
         pdf.drawString(left + half_w + gap + 8, y - 30, settings.SMTP_FROM_NAME)
-        pdf.drawString(left + half_w + gap + 8, y - 44, f"GSTIN: {settings.SELLER_GSTIN}")
         pdf.drawString(left + half_w + gap + 8, y - 58, "Country: India")
 
         y -= box_h + 20
@@ -554,7 +512,7 @@ class PaymentService:
         row_h = 20
         table_rows = 2
         table_h = row_h * table_rows
-        col_widths = [26, 184, 66, 80, 44, 70, 76]
+        col_widths = [26, 260, 96, 108]
         table_w = sum(col_widths)
 
         pdf.rect(left, table_top - table_h, table_w, table_h)
@@ -570,11 +528,11 @@ class PaymentService:
         pdf.rect(left, table_top - row_h, table_w, row_h, fill=1, stroke=0)
         pdf.setFillColorRGB(0, 0, 0)
 
-        headers = ["#", "Description", "HSN/SAC", "Taxable", "GST %", "GST Amt", "Total"]
+        headers = ["#", "Description", "HSN/SAC", "Amount"]
         x = left
         pdf.setFont("Helvetica-Bold", 9)
         for idx, title in enumerate(headers):
-            align_right = idx in (3, 5, 6)
+            align_right = idx in (3,)
             if align_right:
                 pdf.drawRightString(x + col_widths[idx] - 4, table_top - 14, title)
             else:
@@ -586,16 +544,13 @@ class PaymentService:
             "1",
             item_name,
             hsn_sac_code,
-            f"INR {taxable_amount_paise / 100:.2f}",
-            f"{gst_rate_percent}%",
-            f"INR {gst_amount_paise / 100:.2f}",
             f"INR {total_amount_paise / 100:.2f}",
         ]
 
         x = left
         pdf.setFont("Helvetica", 9)
         for idx, value in enumerate(values):
-            align_right = idx in (3, 5, 6)
+            align_right = idx in (3,)
             if align_right:
                 pdf.drawRightString(x + col_widths[idx] - 4, table_top - row_h - 14, value)
             else:
@@ -605,21 +560,12 @@ class PaymentService:
         y = table_top - table_h - 16
 
         summary_w = 230
-        summary_h = 92
+        summary_h = 40
         summary_x = right - summary_w
         pdf.rect(summary_x, y - summary_h, summary_w, summary_h)
         pdf.setFont("Helvetica-Bold", 10)
-        pdf.drawString(summary_x + 8, y - 14, "Tax Summary")
-        pdf.setFont("Helvetica", 9)
-        pdf.drawString(summary_x + 8, y - 30, f"IGST: INR {igst_amount_paise / 100:.2f}")
-        pdf.drawString(summary_x + 8, y - 44, f"CGST: INR {cgst_amount_paise / 100:.2f}")
-        pdf.drawString(summary_x + 8, y - 58, f"SGST: INR {sgst_amount_paise / 100:.2f}")
-        pdf.setFont("Helvetica-Bold", 10)
-        pdf.drawString(summary_x + 8, y - 78, "Grand Total")
-        pdf.drawRightString(summary_x + summary_w - 8, y - 78, f"INR {total_amount_paise / 100:.2f}")
-
-        pdf.setFont("Helvetica", 8)
-        pdf.drawString(left, y - summary_h - 14, "GST summary: Digital products 5%, physical books 0% (exempt).")
+        pdf.drawString(summary_x + 8, y - 24, "Total")
+        pdf.drawRightString(summary_x + summary_w - 8, y - 24, f"INR {total_amount_paise / 100:.2f}")
 
         pdf.showPage()
         pdf.save()

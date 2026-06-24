@@ -175,10 +175,6 @@ class DigitalBookPaymentCreateResponse(BaseModel):
     user_id: UUID
     book_id: int
     amount: int
-    taxable_amount: int
-    gst_rate_percent: int
-    gst_amount: int
-    total_amount: int
     currency: str
     key_id: str
     razorpay_order_id: str
@@ -203,10 +199,6 @@ class DigitalBookPaymentHistoryResponse(BaseModel):
     book_id: int
     book_name: str
     amount: int
-    taxable_amount: int
-    gst_rate_percent: int
-    gst_amount: int
-    total_amount: int
     currency: str
     payment_status: str
     status: str

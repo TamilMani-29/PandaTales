@@ -28,6 +28,7 @@ from app.schemas.digital_book import (
 )
 from app.services.digital_book import DigitalBookService
 from app.services.storage import StorageService
+from app.utils.pdf_storage import maybe_decompress_pdf, to_pdf_download_filename
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
 logger = get_logger(__name__)
@@ -307,7 +308,7 @@ async def _resolve_order_file(
         if not object_name:
             raise NotFoundException("Book PDF is not available")
         media_type = "application/pdf"
-        filename = Path(object_name).name or f"book-{order_id}.pdf"
+        filename = to_pdf_download_filename(object_name, fallback=f"book-{order_id}.pdf")
         return object_name, media_type, filename
 
     object_name = book.cover_image_url or book.front_image_url or book.back_image_url
@@ -349,6 +350,8 @@ async def download_digital_order_file(
     )
     storage = StorageService()
     file_bytes = await storage.download_file(object_name)
+    if file_type == "book":
+        file_bytes = maybe_decompress_pdf(file_bytes, object_name=object_name)
 
     return Response(
         content=file_bytes,
@@ -382,6 +385,8 @@ async def download_digital_order_file_public(
     )
     storage = StorageService()
     file_bytes = await storage.download_file(object_name)
+    if file_type == "book":
+        file_bytes = maybe_decompress_pdf(file_bytes, object_name=object_name)
 
     return Response(
         content=file_bytes,

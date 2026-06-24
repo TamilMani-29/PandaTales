@@ -98,13 +98,13 @@ async def _get_or_create_guest_user(db: AsyncSession, email: str) -> UUID:
     return guest.id
 
 
-# Helper function to handle photo uploads with MinIO storage
+# Helper function to handle photo uploads with Cloudflare R2 storage
 async def process_photo_uploads(
     photos: list[UploadFile],
     storage_service: StorageService,
     max_size_mb: int = 10,
 ) -> list[str]:
-    """Process and upload photos to MinIO, return object names"""
+    """Process and upload photos to Cloudflare R2, return object names"""
     photo_urls = []
     
     for idx, photo in enumerate(photos):
@@ -144,7 +144,7 @@ async def process_personalized_uploads(
 ) -> tuple[list[str], str]:
     """Upload photos to personalized/{child_name}_{folder_id}/ and return (object_names, folder).
 
-    Uses a stable folder per submission so admin can browse organized folders in MinIO.
+    Uses a stable folder per submission so admin can browse organized folders in R2.
     """
     safe_name = re.sub(r"[^a-z0-9]+", "_", (child_name or "child").lower()).strip("_")[:30]
     folder_id = str(uuid4()).replace("-", "")[:12]
@@ -261,7 +261,7 @@ async def generate_photo_to_coloring_book(
     if len(photos) > 10:
         raise BadRequestException("Maximum 10 photos allowed for photo-to-coloring")
     
-    # Upload photos to personalized/{child_name}_{folder_id}/ for organized MinIO storage
+    # Upload photos to personalized/{child_name}_{folder_id}/ for organized R2 storage
     storage_service = StorageService()
     photo_urls, _folder = await process_personalized_uploads(photos, storage_service, child_name)
     
@@ -518,7 +518,7 @@ async def download_book_pdf(
     Build a PDF from all generated page images and stream it to the client.
 
     Pages are ordered by their page_number. Each Replicate-generated PNG
-    is fetched from MinIO and composed into a multi-page PDF using Pillow.
+    is fetched from object storage and composed into a multi-page PDF using Pillow.
     """
     from datetime import timedelta
     from PIL import Image

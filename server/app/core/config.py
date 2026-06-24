@@ -61,16 +61,17 @@ class Settings(BaseSettings):
     GOOGLE_REDIRECT_URI: str = ""
 
     # Storage
-    STORAGE_PROVIDER: Literal["s3", "minio"] = "minio"
-    
-    # MinIO
-    MINIO_ENDPOINT: str = "localhost:9000"
-    MINIO_ACCESS_KEY: str = "minioadmin"
-    MINIO_SECRET_KEY: str = "minioadmin123"
-    MINIO_BUCKET: str = "pandatales"
-    MINIO_SECURE: bool = False
-    MINIO_REGION: str = "us-east-1"
-    MINIO_PUBLIC_BASE_URL: str = ""
+    STORAGE_PROVIDER: Literal["s3", "r2"] = "r2"
+
+    # Cloudflare R2 (S3-compatible)
+    R2_ENDPOINT: str = ""
+    R2_ACCESS_KEY_ID: str = ""
+    R2_SECRET_ACCESS_KEY: str = ""
+    R2_BUCKET: str = "pandatales"
+    R2_SECURE: bool = True
+    R2_VERIFY_SSL: bool = True
+    R2_REGION: str = "auto"
+    R2_PUBLIC_BASE_URL: str = ""
 
     # AWS S3 (alternative)
     AWS_ACCESS_KEY_ID: str = ""

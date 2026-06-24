@@ -26,7 +26,7 @@ router = APIRouter(prefix="/digital-books", tags=["Digital Books"])
     response_model=dict[str, Any],
     status_code=status.HTTP_201_CREATED,
     summary="Create a digital book",
-    description="Create digital book metadata, upload cover/front/back images and PDF to MinIO, and save URLs in DB.",
+    description="Create digital book metadata, upload cover/front/back images and PDF to Cloudflare R2, and save URLs in DB.",
 )
 async def create_digital_book(
     book_name: str = Form(..., min_length=1, max_length=255),
@@ -435,7 +435,7 @@ async def update_digital_book(
     response_model=dict[str, Any],
     status_code=status.HTTP_200_OK,
     summary="Delete a digital book",
-    description="Delete a digital book record by ID. MinIO assets (images/PDF) are not removed.",
+    description="Delete a digital book record by ID. R2 assets (images/PDF) are not removed.",
 )
 async def delete_digital_book(
     book_id: int,
@@ -487,7 +487,7 @@ async def get_digital_book_preview_pdf(book_id: int, db: AsyncSession = Depends(
     include_in_schema=False,
 )
 async def serve_storage_image(object_path: str) -> Response:
-    """Proxy MinIO/storage images so the browser can always reach them."""
+    """Proxy storage images so the browser can always reach them."""
     storage = StorageService()
     try:
         data = await storage.download_file(object_path)

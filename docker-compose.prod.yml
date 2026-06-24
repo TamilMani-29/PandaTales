@@ -52,13 +52,15 @@ services:
       # Database - Production (connects to containerized PostgreSQL)
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-pandatales_prod}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-pandatales_prod}
       
-      # MinIO - Production (connects to containerized MinIO)
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
-      MINIO_BUCKET: ${MINIO_BUCKET:-pandatales}
-      MINIO_SECURE: "false"
-      MINIO_PUBLIC_BASE_URL: ${MINIO_PUBLIC_BASE_URL:-/minio}
+      # Cloudflare R2 - Production
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-r2}
+      R2_ENDPOINT: ${R2_ENDPOINT}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      R2_BUCKET: ${R2_BUCKET:-pandatales}
+      R2_SECURE: ${R2_SECURE:-true}
+      R2_REGION: ${R2_REGION:-auto}
+      R2_PUBLIC_BASE_URL: ${R2_PUBLIC_BASE_URL:-}
       
       # JWT - Production (REQUIRED - set strong secrets in .env.prod)
       SECRET_KEY: ${SECRET_KEY}

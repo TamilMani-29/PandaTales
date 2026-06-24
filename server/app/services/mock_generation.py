@@ -374,7 +374,7 @@ class MockGenerationWorker:
     async def _generate_coloring_preview_pages(
         self, generation_id: UUID, book: Any, num_pages: int, theme: str = "general"
     ) -> list[dict[str, Any]]:
-        """Generate mock coloring page previews and upload to MinIO"""
+        """Generate mock coloring page previews and upload to R2"""
         preview_pages = []
 
         for page_num in range(1, min(num_pages, 5) + 1):  # Generate up to 5 preview pages
@@ -383,7 +383,7 @@ class MockGenerationWorker:
                 page_number=page_num, theme=theme
             )
 
-            # Upload to MinIO
+            # Upload to R2
             file_obj = io.BytesIO(page_image_bytes)
             file_obj.name = f"page_{page_num}.png"
             object_name = await self.storage_service.upload_file(
@@ -422,7 +422,7 @@ class MockGenerationWorker:
                 page_number=page_num, theme="story"
             )
 
-            # Upload to MinIO
+            # Upload to R2
             file_obj = io.BytesIO(page_image_bytes)
             file_obj.name = f"page_{page_num}.png"
             object_name = await self.storage_service.upload_file(
@@ -459,7 +459,7 @@ class MockGenerationWorker:
             child_name=book.child_name, template_type=book.template_type
         )
 
-        # Upload cover to MinIO
+        # Upload cover to R2
         cover_file = io.BytesIO(cover_image_bytes)
         cover_file.name = "cover.png"
         cover_object_name = await self.storage_service.upload_file(
@@ -479,7 +479,7 @@ class MockGenerationWorker:
             num_pages=book.total_pages or 10,
         )
 
-        # Upload PDF to MinIO
+        # Upload PDF to R2
         pdf_file = io.BytesIO(pdf_bytes)
         pdf_file.name = "book.pdf"
         pdf_object_name = await self.storage_service.upload_file(

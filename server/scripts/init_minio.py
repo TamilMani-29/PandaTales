@@ -1,4 +1,4 @@
-"""Initialize MinIO bucket and setup for PandaTales"""
+"""Initialize Cloudflare R2 bucket and setup for PandaTales."""
 
 import io
 import json
@@ -16,12 +16,13 @@ settings = get_settings()
 
 
 def create_minio_client() -> Minio:
-    """Create MinIO client"""
+    """Create R2 client (S3-compatible)."""
     return Minio(
-        settings.MINIO_ENDPOINT,
-        access_key=settings.MINIO_ACCESS_KEY,
-        secret_key=settings.MINIO_SECRET_KEY,
-        secure=settings.MINIO_SECURE,
+        settings.R2_ENDPOINT,
+        access_key=settings.R2_ACCESS_KEY_ID,
+        secret_key=settings.R2_SECRET_ACCESS_KEY,
+        secure=settings.R2_SECURE,
+        region=settings.R2_REGION,
     )
 
 
@@ -149,21 +150,20 @@ def set_lifecycle_policy(client: Minio, bucket: str) -> None:
         print("   ℹ Temporary files (generated/temp/) will be deleted after 7 days")
     except Exception as e:
         print(f"   ⚠ Error setting lifecycle policy: {e}")
-        print("   ℹ This feature may not be available in older MinIO versions")
+        print("   ℹ This feature may not be available in all S3-compatible providers")
 
 
 def print_summary(bucket: str) -> None:
     """Print setup summary"""
     
     print("\n" + "=" * 70)
-    print("✅ MinIO setup completed successfully!")
+    print("✅ R2 setup completed successfully!")
     print("=" * 70)
     
     print(f"\n📦 Bucket: {bucket}")
-    print(f"🌐 MinIO Console: http://{settings.MINIO_ENDPOINT.replace(':9000', ':9001')}")
-    print(f"🔌 API Endpoint: http://{settings.MINIO_ENDPOINT}")
-    print(f"👤 Access Key: {settings.MINIO_ACCESS_KEY}")
-    print(f"🗂️  Region: {settings.MINIO_REGION}")
+    print(f"🔌 R2 Endpoint: {settings.R2_ENDPOINT}")
+    print(f"👤 Access Key: {settings.R2_ACCESS_KEY_ID}")
+    print(f"🗂️  Region: {settings.R2_REGION}")
     
     print("\n📋 Directory Structure Created:")
     print("   ├── templates/")
@@ -185,24 +185,24 @@ def print_summary(bucket: str) -> None:
     print("   ✓ Temp files deleted after 7 days")
     
     print("\n🧪 Test with AWS CLI:")
-    print(f"   export AWS_ACCESS_KEY_ID={settings.MINIO_ACCESS_KEY}")
-    print(f"   export AWS_SECRET_ACCESS_KEY={settings.MINIO_SECRET_KEY}")
-    print(f"   aws s3 ls s3://{bucket}/ --endpoint-url http://{settings.MINIO_ENDPOINT}")
+    print(f"   export AWS_ACCESS_KEY_ID={settings.R2_ACCESS_KEY_ID}")
+    print(f"   export AWS_SECRET_ACCESS_KEY={settings.R2_SECRET_ACCESS_KEY}")
+    print(f"   aws s3 ls s3://{bucket}/ --endpoint-url https://{settings.R2_ENDPOINT}")
     
     print("\n" + "=" * 70)
 
 
 def setup_minio() -> None:
-    """Main setup function for MinIO"""
+    """Main setup function for R2."""
     
     print("=" * 70)
-    print("🐼 PandaTales MinIO Setup")
+    print("🐼 PandaTales R2 Setup")
     print("=" * 70)
     
-    bucket = settings.MINIO_BUCKET
+    bucket = settings.R2_BUCKET
     
     try:
-        print("\n🔌 Connecting to MinIO...")
+        print("\n🔌 Connecting to R2...")
         client = create_minio_client()
         
         # Check if bucket exists
@@ -211,7 +211,7 @@ def setup_minio() -> None:
             print(f"   ✓ Bucket '{bucket}' already exists")
         else:
             # Create bucket
-            client.make_bucket(bucket, location=settings.MINIO_REGION)
+            client.make_bucket(bucket, location=settings.R2_REGION)
             print(f"   ✓ Created bucket '{bucket}'")
         
         # Create directory structure
@@ -227,11 +227,11 @@ def setup_minio() -> None:
         print_summary(bucket)
         
     except S3Error as e:
-        print(f"\n❌ MinIO Error: {e}")
+        print(f"\n❌ R2 Error: {e}")
         print(f"\nDetails:")
-        print(f"   Endpoint: {settings.MINIO_ENDPOINT}")
+        print(f"   Endpoint: {settings.R2_ENDPOINT}")
         print(f"   Bucket: {bucket}")
-        print(f"   Secure: {settings.MINIO_SECURE}")
+        print(f"   Secure: {settings.R2_SECURE}")
         sys.exit(1)
     except Exception as e:
         print(f"\n❌ Error: {e}")

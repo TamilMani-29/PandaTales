@@ -1,4 +1,4 @@
-"""Storage Service for MinIO/S3 operations with comprehensive error handling"""
+"""Storage service for Cloudflare R2 (S3-compatible) operations."""
 
 import asyncio
 import io
@@ -7,10 +7,11 @@ from pathlib import Path
 from typing import BinaryIO, Literal
 from uuid import UUID, uuid4
 
+import boto3
+from botocore.config import Config as BotoConfig
+from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import UploadFile as FastAPIUploadFile
 from starlette.datastructures import UploadFile
-from minio import Minio
-from minio.error import S3Error
 
 from app.common.exceptions import (
     BadRequestException,
@@ -24,18 +25,33 @@ logger = get_logger(__name__)
 
 
 class StorageService:
-    """Service for handling file storage operations with MinIO/S3"""
+    """Service for handling file storage operations with Cloudflare R2."""
 
     def __init__(self):
-        """Initialize MinIO client"""
+        """Initialize R2 client using S3-compatible API."""
         try:
-            self.client = Minio(
-                settings.MINIO_ENDPOINT,
-                access_key=settings.MINIO_ACCESS_KEY,
-                secret_key=settings.MINIO_SECRET_KEY,
-                secure=settings.MINIO_SECURE,
+            endpoint = settings.R2_ENDPOINT.strip()
+            if endpoint.startswith("http://") or endpoint.startswith("https://"):
+                endpoint_url = endpoint
+            else:
+                scheme = "https" if settings.R2_SECURE else "http"
+                endpoint_url = f"{scheme}://{endpoint}"
+
+            self.client = boto3.client(
+                "s3",
+                endpoint_url=endpoint_url,
+                aws_access_key_id=settings.R2_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
+                region_name=settings.R2_REGION,
+                config=BotoConfig(signature_version="s3v4"),
+                verify=settings.R2_VERIFY_SSL,
             )
-            self.bucket = settings.MINIO_BUCKET
+            self.bucket = settings.R2_BUCKET
+            if not settings.R2_VERIFY_SSL:
+                logger.warning(
+                    "r2_ssl_verification_disabled",
+                    reason="R2_VERIFY_SSL is false; use only for local troubleshooting",
+                )
         except Exception as e:
             logger.error("storage_init_error", error=str(e), exc_info=True)
             raise ServiceUnavailableException(
@@ -50,7 +66,7 @@ class StorageService:
         max_size_mb: int | None = None,
     ) -> str:
         """
-        Upload file to MinIO with comprehensive error handling
+        Upload file to R2 with comprehensive error handling.
         
         Args:
             file: File to upload (UploadFile or BinaryIO)
@@ -103,16 +119,16 @@ class StorageService:
             if file_size == 0:
                 raise BadRequestException(message="File is empty")
             
-            # Upload to MinIO — run blocking SDK call off the event loop
-            logger.info("uploading_file_to_minio", object_name=object_name, size_bytes=file_size, content_type=content_type)
+            # Upload to R2 - run blocking SDK call off the event loop.
+            logger.info("uploading_file_to_r2", object_name=object_name, size_bytes=file_size, content_type=content_type)
             
             await asyncio.to_thread(
                 self.client.put_object,
-                self.bucket,
-                object_name,
-                upload_stream,
-                file_size,
-                content_type or "application/octet-stream",
+                Bucket=self.bucket,
+                Key=object_name,
+                Body=upload_stream,
+                ContentLength=file_size,
+                ContentType=content_type or "application/octet-stream",
             )
             
             logger.info("file_uploaded_successfully", object_name=object_name, size_bytes=file_size)
@@ -122,24 +138,27 @@ class StorageService:
             # Re-raise validation errors
             raise
             
-        except S3Error as e:
+        except ClientError as e:
+            err = e.response.get("Error", {})
+            code = str(err.get("Code", "Unknown"))
+            message = str(err.get("Message", str(e)))
             logger.error(
-                "minio_upload_error",
+                "r2_upload_error",
                 object_name=object_name,
-                error_code=e.code,
-                error_message=e.message,
+                error_code=code,
+                error_message=message,
                 exc_info=True,
             )
             
-            if e.code == "NoSuchBucket":
+            if code in {"NoSuchBucket", "NotFound", "404"}:
                 raise ServiceUnavailableException(
                     message="Storage bucket not found. Please contact support."
                 )
-            elif e.code == "AccessDenied":
+            elif code in {"AccessDenied", "403"}:
                 raise ServiceUnavailableException(
                     message="Storage access denied. Please contact support."
                 )
-            elif e.code == "EntityTooLarge":
+            elif code == "EntityTooLarge":
                 raise BadRequestException(
                     message="File is too large for storage system"
                 )
@@ -147,6 +166,12 @@ class StorageService:
                 raise ServiceUnavailableException(
                     message="Failed to upload file. Please try again."
                 )
+
+        except BotoCoreError as e:
+            logger.error("r2_upload_core_error", object_name=object_name, error=str(e), exc_info=True)
+            raise ServiceUnavailableException(
+                message="Failed to upload file. Please try again."
+            )
                 
         except Exception as e:
             logger.error("unexpected_upload_error", object_name=object_name, error=str(e), exc_info=True)
@@ -199,7 +224,7 @@ class StorageService:
             else:
                 filename = file.filename or f"{uuid4()}{file_ext}"
             
-            # Map prefix to storage path per MINIO_STORAGE_DESIGN.md
+            # Map prefix to storage path conventions.
             prefix_map = {
                 "avatars": "users/avatars",
                 "photos": "users/uploads/photos",
@@ -237,7 +262,7 @@ class StorageService:
         max_size_mb: int = 10,
     ) -> str:
         """
-        Upload a personalized order photo to a dedicated folder in MinIO.
+        Upload a personalized order photo to a dedicated folder in R2.
         
         Object path: {folder}/photo_{index+1}{ext}
         e.g. personalized/arjun_abc123/photo_1.jpg
@@ -289,22 +314,27 @@ class StorageService:
         """
         try:
             # Optionally check object existence. For list views we can skip this to avoid
-            # slow retries when MinIO is temporarily unavailable.
+            # slow retries when storage is temporarily unavailable.
             if check_exists:
                 try:
                     await asyncio.wait_for(
-                        asyncio.to_thread(self.client.stat_object, self.bucket, object_name),
+                        asyncio.to_thread(
+                            self.client.head_object,
+                            Bucket=self.bucket,
+                            Key=object_name,
+                        ),
                         timeout=stat_timeout_seconds,
                     )
-                except S3Error as e:
-                    if e.code == "NoSuchKey":
+                except ClientError as e:
+                    code = str(e.response.get("Error", {}).get("Code", "Unknown"))
+                    if code in {"NoSuchKey", "404", "NotFound"}:
                         raise NotFoundException(
                             message=f"File not found: {object_name}"
                         )
                     raise
                 except asyncio.TimeoutError as exc:
                     logger.warning(
-                        "minio_stat_timeout",
+                        "r2_stat_timeout",
                         object_name=object_name,
                         timeout_seconds=stat_timeout_seconds,
                     )
@@ -314,10 +344,10 @@ class StorageService:
             
             # Generate presigned URL — run blocking SDK call off the event loop
             url = await asyncio.to_thread(
-                self.client.presigned_get_object,
-                self.bucket,
-                object_name,
-                expires,
+                self.client.generate_presigned_url,
+                "get_object",
+                Params={"Bucket": self.bucket, "Key": object_name},
+                ExpiresIn=max(int(expires.total_seconds()), 1),
             )
             
             logger.info("generated_presigned_url", object_name=object_name, expires_seconds=int(expires.total_seconds()))
@@ -326,14 +356,21 @@ class StorageService:
         except NotFoundException:
             raise
             
-        except S3Error as e:
+        except ClientError as e:
+            err = e.response.get("Error", {})
             logger.error(
-                "minio_url_generation_error",
+                "r2_url_generation_error",
                 object_name=object_name,
-                error_code=e.code,
-                error_message=e.message,
+                error_code=err.get("Code"),
+                error_message=err.get("Message"),
                 exc_info=True,
             )
+            raise ServiceUnavailableException(
+                message="Failed to generate file access URL"
+            )
+
+        except BotoCoreError as e:
+            logger.error("r2_url_generation_core_error", object_name=object_name, error=str(e), exc_info=True)
             raise ServiceUnavailableException(
                 message="Failed to generate file access URL"
             )
@@ -346,7 +383,7 @@ class StorageService:
 
     def get_public_file_url(self, object_name: str) -> str | None:
         """Build a browser-accessible object URL when public base URL is configured."""
-        public_base = (settings.MINIO_PUBLIC_BASE_URL or "").strip().rstrip("/")
+        public_base = (settings.R2_PUBLIC_BASE_URL or "").strip().rstrip("/")
         if not public_base or not object_name:
             return None
         object_path = str(object_name).lstrip("/")
@@ -354,7 +391,7 @@ class StorageService:
 
     async def download_file(self, object_name: str) -> bytes:
         """
-        Download file content from MinIO
+        Download file content from R2.
         
         Args:
             object_name: Path/name in bucket
@@ -370,30 +407,38 @@ class StorageService:
             # Download file — run blocking SDK call off the event loop
             response = await asyncio.to_thread(
                 self.client.get_object,
-                self.bucket,
-                object_name,
+                Bucket=self.bucket,
+                Key=object_name,
             )
             
             # Read all data from response
-            data = response.read()
-            response.close()
-            response.release_conn()
+            body = response["Body"]
+            data = body.read()
+            body.close()
             
             logger.info("file_downloaded", object_name=object_name, size_bytes=len(data))
             return data
             
-        except S3Error as e:
-            if e.code == "NoSuchKey":
+        except ClientError as e:
+            code = str(e.response.get("Error", {}).get("Code", "Unknown"))
+            message = str(e.response.get("Error", {}).get("Message", str(e)))
+            if code in {"NoSuchKey", "404", "NotFound"}:
                 raise NotFoundException(
                     message=f"File not found: {object_name}"
                 )
             logger.error(
-                "minio_download_error",
+                "r2_download_error",
                 object_name=object_name,
-                error_code=e.code,
-                error_message=e.message,
+                error_code=code,
+                error_message=message,
                 exc_info=True,
             )
+            raise ServiceUnavailableException(
+                message="Failed to download file"
+            )
+
+        except BotoCoreError as e:
+            logger.error("r2_download_core_error", object_name=object_name, error=str(e), exc_info=True)
             raise ServiceUnavailableException(
                 message="Failed to download file"
             )
@@ -406,7 +451,7 @@ class StorageService:
 
     async def delete_file(self, object_name: str) -> bool:
         """
-        Delete file from MinIO
+        Delete file from R2.
         
         Args:
             object_name: Path/name in bucket
@@ -418,22 +463,34 @@ class StorageService:
             ServiceUnavailableException: Deletion failed
         """
         try:
-            await asyncio.to_thread(self.client.remove_object, self.bucket, object_name)
+            await asyncio.to_thread(
+                self.client.delete_object,
+                Bucket=self.bucket,
+                Key=object_name,
+            )
             logger.info("file_deleted", object_name=object_name)
             return True
             
-        except S3Error as e:
-            if e.code == "NoSuchKey":
+        except ClientError as e:
+            code = str(e.response.get("Error", {}).get("Code", "Unknown"))
+            message = str(e.response.get("Error", {}).get("Message", str(e)))
+            if code in {"NoSuchKey", "404", "NotFound"}:
                 logger.warning("file_not_found_for_deletion", object_name=object_name)
                 return False
                 
             logger.error(
-                "minio_delete_error",
+                "r2_delete_error",
                 object_name=object_name,
-                error_code=e.code,
-                error_message=e.message,
+                error_code=code,
+                error_message=message,
                 exc_info=True,
             )
+            raise ServiceUnavailableException(
+                message="Failed to delete file"
+            )
+
+        except BotoCoreError as e:
+            logger.error("r2_delete_core_error", object_name=object_name, error=str(e), exc_info=True)
             raise ServiceUnavailableException(
                 message="Failed to delete file"
             )
@@ -446,7 +503,7 @@ class StorageService:
 
     async def file_exists(self, object_name: str) -> bool:
         """
-        Check if file exists in MinIO
+        Check if file exists in R2.
         
         Args:
             object_name: Path/name in bucket
@@ -455,12 +512,20 @@ class StorageService:
             bool: True if file exists
         """
         try:
-            await asyncio.to_thread(self.client.stat_object, self.bucket, object_name)
+            await asyncio.to_thread(
+                self.client.head_object,
+                Bucket=self.bucket,
+                Key=object_name,
+            )
             return True
-        except S3Error as e:
-            if e.code == "NoSuchKey":
+        except ClientError as e:
+            code = str(e.response.get("Error", {}).get("Code", "Unknown"))
+            if code in {"NoSuchKey", "404", "NotFound"}:
                 return False
             logger.error("file_exists_check_error", object_name=object_name, error=str(e), exc_info=True)
+            return False
+        except BotoCoreError as e:
+            logger.error("file_exists_check_core_error", object_name=object_name, error=str(e), exc_info=True)
             return False
         except Exception as e:
             logger.error("unexpected_file_exists_error", object_name=object_name, error=str(e), exc_info=True)
@@ -476,12 +541,16 @@ class StorageService:
         Returns:
             str: Public URL (no expiration)
         """
-        # Per MINIO_STORAGE_DESIGN.md, public paths don't need presigned URLs
+        # For public paths, return direct URL when a public base URL is configured.
         if object_name.startswith(("templates/", "public/")):
-            return f"http://{settings.MINIO_ENDPOINT}/{self.bucket}/{object_name}"
+            public_url = self.get_public_file_url(object_name)
+            if public_url:
+                return public_url
         else:
             # For private files, return presigned URL with 7-day expiration
             return await self.get_file_url(object_name, expires=timedelta(days=7))
+
+        return await self.get_file_url(object_name, expires=timedelta(days=7))
 
 
 def get_storage_service() -> StorageService:

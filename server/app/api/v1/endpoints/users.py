@@ -82,7 +82,7 @@ async def upload_avatar(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    """Upload user avatar to MinIO with proper error handling"""
+    """Upload user avatar to Cloudflare R2 with proper error handling"""
     
     # Initialize storage service
     storage_service = StorageService()

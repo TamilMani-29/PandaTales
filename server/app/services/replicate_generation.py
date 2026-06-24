@@ -1,7 +1,7 @@
 """Replicate AI Image Generation Service
 
 Handles calling the Replicate img2img API to generate storybook pages in parallel,
-polling for completion, and storing results in MinIO.
+polling for completion, and storing results in Cloudflare R2.
 """
 
 import asyncio
@@ -77,7 +77,7 @@ class ReplicateGenerationService:
                 limited_pages=len(pages),
             )
 
-        # Download image from MinIO and convert to base64 data URI
+        # Download image from object storage and convert to base64 data URI
         # This avoids localhost URL issues when Replicate tries to download
         try:
             image_data = await self.storage.download_file(reference_photo_object)
@@ -504,7 +504,7 @@ class ReplicateGenerationService:
         child_gender: str,
     ) -> str | None:
         """
-        Download generated image from Replicate CDN, add text overlay, and store in MinIO.
+        Download generated image from Replicate CDN, add text overlay, and store in R2.
         
         Args:
             image_url: URL of the generated image from Replicate
@@ -539,7 +539,7 @@ class ReplicateGenerationService:
                     text_length=len(personalized_text),
                 )
 
-            # Upload to MinIO
+            # Upload to R2
             object_name = f"generated/books/story/{book_id}/pages/{page_key}.png"
             await self.storage.upload_file(
                 file=io.BytesIO(image_bytes),
